@@ -103,7 +103,7 @@ dag init
 | `dag switch <name>` | Switch active feature workspace context |
 | `dag stack [base-branch]` | Fetch base/PR branch and create a clean stacked feature branch |
 | `dag config [preset]` | Manage providers, models, and API keys (built-ins & custom presets) |
-| `dag refine "<prompt>"` | Step 0: Decompose prompt into requirements & assumptions |
+| `dag refine "<prompt>"` | Step 0: Decompose prompt into requirements & assumptions (supports `--file` and `--context`) |
 | `dag contract` | Step 1: Whole-repo recon $\to$ draft contract $\to$ skeptic audit (Gate 1) |
 | `dag layers` | Step 2: Parallel 3-layer fanout $\to$ merge `05-tasks.md` (Gate 2) |
 | `dag next` | Step 3: Implement next task with tests-first TDD & auto-healing test loop |

@@ -191,15 +191,50 @@ function parseRefinementItems(text) {
   return { questions, assumptions };
 }
 
-async function runStep0(featureAsk) {
+async function runStep0(featureAsk, options = {}) {
   banner('STEP 0: REFINE THE RAW ASK');
   const provider = getProviderForStage('refine');
+
+  let existingContext = '';
+
+  // 1. Check for --file or --plan flag
+  const fileArg = process.argv.find(a => a.startsWith('--file=') || a.startsWith('--plan='));
+  const targetFile = fileArg ? fileArg.split('=')[1].trim() : (options.file || options.plan || '');
+
+  if (targetFile && fs.existsSync(targetFile)) {
+    try {
+      const fileContent = fs.readFileSync(targetFile, 'utf8').trim();
+      existingContext += `\n\n==================== PRE-EXISTING PLAN / RFC (${path.basename(targetFile)}) ====================\n${fileContent}\n================================================================================`;
+      logSuccess(`Ingested pre-existing architecture plan from ${targetFile}`);
+    } catch (e) {
+      logWarning(`Could not read plan file: ${e.message}`);
+    }
+  }
+
+  // 2. Check for inline --context flag
+  const contextArg = process.argv.find(a => a.startsWith('--context='));
+  if (contextArg) {
+    const rawCtx = contextArg.slice(10).replace(/^["']|["']$/g, '');
+    existingContext += `\n\n==================== USER ARCHITECTURAL CONSTRAINTS ====================\n${rawCtx}\n========================================================================`;
+    logSuccess('Loaded inline architectural constraints');
+  }
+
+  // Strip flags from feature ask string
+  const cleanAsk = featureAsk
+    .replace(/--(file|plan|context)=("[^"]*"|'[^']*'|[^\s]+)/gi, '')
+    .trim() || 'Software Engineering Feature';
+
+  const fullRefinePrompt = cleanAsk + existingContext;
+
   logStep('Step 0 Prompt Refinement', provider.name, provider.model);
 
-  const refinementResult = await executeStagePrompt('refine', featureAsk);
+  const refinementResult = await executeStagePrompt('refine', fullRefinePrompt);
   const { questions, assumptions } = parseRefinementItems(refinementResult);
 
   const answeredQA = [];
+  if (existingContext) {
+    answeredQA.push(`PRE-EXISTING CONSTRAINTS & ARCHITECTURE NOTES:\n${existingContext}`);
+  }
 
   if (questions.length > 0 || assumptions.length > 0) {
     console.log('📋 Let\'s clarify a few details one-by-one before drafting requirements:\n');
@@ -1275,6 +1310,23 @@ ${ANSI.cyan}Examples:${ANSI.reset}
   dag service link billing ../billing-service
   dag service link notifications ../packages/notifications
           `);
+        } else if (helpTopic === 'refine' || helpTopic === 'step0') {
+          console.log(`
+${ANSI.bold}DAG CLI Help: Step 0 Requirements Refinement & Plan Ingestion${ANSI.reset}
+
+${ANSI.cyan}Usage:${ANSI.reset}
+  dag refine <feature-ask> [flags]
+
+${ANSI.cyan}Flags for Pre-Existing Plans & Context:${ANSI.reset}
+  --file=<path>            Ingest an existing RFC, technical plan, or markdown spec (e.g. --file=docs/rfc.md)
+  --plan=<path>            Alias for --file
+  --context="<text>"       Provide inline architectural notes, database constraints, or tech stack requirements
+
+${ANSI.cyan}Examples:${ANSI.reset}
+  dag refine "Add campaign scheduler" --context="Use PostgreSQL tsrange, UUIDv7, and Redis locks"
+  dag refine "Migrate auth to JWT" --file=docs/plans/auth-v2.md
+  dag refine "Build date-picker component" # Launches interactive UI reference wizard
+          `);
         } else {
           console.log(`
 ${ANSI.bold}DAG CLI - Universal Model-Agnostic & Harness-Agnostic Pipeline (v0.1.0-alpha)${ANSI.reset}
@@ -1295,7 +1347,7 @@ ${ANSI.cyan}Core Commands:${ANSI.reset}
   dag ship [title]         Bundle contract + skeptic report & open Pull Request
 
 ${ANSI.cyan}Pipeline Stages:${ANSI.reset}
-  dag refine <ask>         Step 0: Decompose prompt into requirements & assumptions
+  dag refine <ask>         Step 0: Decompose prompt into requirements & assumptions (--file, --context)
   dag contract             Step 1: Whole-repo recon -> Interface contract -> Skeptic audit [Gate 1]
   dag layers               Step 2: Parallel 3-layer fan-out -> Merge tasks checklist [Gate 2]
   dag next                 Step 3: Implement next task with tests-first TDD & auto-healing
@@ -1304,10 +1356,12 @@ ${ANSI.cyan}Pipeline Stages:${ANSI.reset}
   dag web                  Launch optional DeepSeek Harness web dashboard
 
 ${ANSI.cyan}Flags:${ANSI.reset}
+  --file=<path>            Ingest pre-existing RFC or architecture plan into Step 0
+  --context="<text>"       Inject inline technical constraints into Step 0
   --json                   Output machine-readable JSON for CI/CD and IDE extensions
   --auto-gate              Allow Pre-Flight Verifier to auto-approve gates if 100% passing
 
-${ANSI.dim}Run \`dag help <command>\` for detailed command guidance (e.g. \`dag help config\`, \`dag help stack\`).${ANSI.reset}
+${ANSI.dim}Run \`dag help <command>\` for detailed command guidance (e.g. \`dag help refine\`, \`dag help config\`).${ANSI.reset}
           `);
         }
         break;

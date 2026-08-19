@@ -127,11 +127,15 @@ dag doctor
 
 ### The Standard Feature Recipe:
 ```bash
-# 1. Stack a feature branch off your base branch or active PR
-dag stack develop feature/campaign-v3
-
 # 2. Step 0: Refine the prompt into requirements
+# Basic usage:
 dag refine "Add recurring scheduling time windows to campaigns table"
+
+# Advanced: Ingest an existing architecture plan, RFC, or notes:
+dag refine "Add recurring scheduler" --file=docs/rfcs/scheduler-v1.md
+
+# Advanced: Pass inline technical constraints:
+dag refine "Add recurring scheduler" --context="Use PostgreSQL tsrange, UUIDv7 IDs, and Redis locks"
 
 # 3. Step 1: Draft contract spec & audit with Skeptic (Gate 1)
 dag contract
