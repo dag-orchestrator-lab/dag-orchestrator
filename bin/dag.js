@@ -29,6 +29,7 @@ import { recordStageMetrics, getFeatureBenchmark } from '../src/metrics.js';
 import { loadProjectRules, formatRulesForPrompt, appendLearnedRule } from '../src/rules.js';
 import { verifyContractSpec, verifyTaskList, renderVerificationReport, verifyFullPipeline } from '../src/verifier.js';
 import { linkService, unlinkService, harvestAllLinkedServices, renderServicesList } from '../src/services.js';
+import { isFrontendTask, processUIDesignReference, formatUIContractSection } from '../src/ui-design.js';
 import { banner, logStep, logSuccess, logWarning, logError, logGate, renderStatusCard, ANSI } from '../src/ui.js';
 import { getProviderForStage, executeStagePrompt } from '../src/providers/index.js';
 import { geminiPromptRefine } from '../src/gemini.js';
@@ -235,6 +236,40 @@ async function runStep0(featureAsk) {
         }
 
         answeredQA.push(`Assumption: ${assumptions[i]}\nStatus: ${confirmation}`);
+      }
+    }
+
+    // Frontend UI/UX Design Detection & Interactive Wizard
+    const repoSummary = getRepoContextSummary();
+    if (isFrontendTask(featureAsk, repoSummary)) {
+      console.log(`\n${ANSI.magenta}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+      console.log(`│ 🎨 FRONTEND WORK DETECTED: Let's align on the UI/UX design reference│`);
+      console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
+      console.log(`👉 How would you like to provide the UI/UX specification? (Optional)`);
+      console.log(`   ${ANSI.bold}[1] 🎨 Figma File / Node URL${ANSI.reset} (Extracts Auto-Layout JSON & exact CSS)`);
+      console.log(`   ${ANSI.bold}[2] 📄 HTML / Tailwind / v0 Wireframe${ANSI.reset} (Local file path)`);
+      console.log(`   ${ANSI.bold}[3] 🪙 Design System Tokens${ANSI.reset} (Theme JSON / Palette)`);
+      console.log(`   ${ANSI.bold}[4] 🤖 Let AI Design It${ANSI.reset} (with custom visual direction / website URL)`);
+      console.log(`   ${ANSI.bold}[5] ⏩ Skip${ANSI.reset} (Standard responsive component)\n`);
+
+      const designChoice = await askQuestion('Selection [1/2/3/4/5] (Default: 4): ');
+      const cleanChoice = designChoice.trim() || '4';
+
+      if (cleanChoice !== '5') {
+        let designInput = '';
+        if (cleanChoice === '1') {
+          designInput = await askQuestion('👉 Enter Figma file or node URL: ');
+        } else if (cleanChoice === '2') {
+          designInput = await askQuestion('👉 Enter relative path to HTML/JSX wireframe file: ');
+        } else if (cleanChoice === '4') {
+          designInput = await askQuestion('👉 Enter visual direction, theme, or reference website URL: ');
+        }
+
+        const processedDesign = await processUIDesignReference(cleanChoice, designInput);
+        if (processedDesign) {
+          answeredQA.push(`UI/UX Design Reference (${processedDesign.source}):\n${processedDesign.spec}`);
+          logSuccess(`Harvested design reference from: ${processedDesign.source}`);
+        }
       }
     }
 

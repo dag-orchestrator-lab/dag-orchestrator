@@ -22,6 +22,8 @@ export const DEFAULT_CONFIG = {
   PROVIDER_CODING: 'claude',
   PROVIDER_CONFORMANCE: 'gemini',
   PROVIDER_REVIEW: 'gemini',
+  PROVIDER_DESIGN: 'gemini',
+  PROVIDER_VISION: 'gemini',
 
   // Model identifiers
   GEMINI_FLASH_MODEL: 'gemini-3.6-flash',

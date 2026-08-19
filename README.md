@@ -146,6 +146,7 @@ The DAG Orchestrator roadmap is designed around increasing IDE integration, mult
 - [x] Asymmetric multi-model routing & benchmark cost engine (`dag stats`).
 - [x] Pre-Flight Gate Verifier & adaptive `.dagrules` policy learning loop.
 - [x] JIT Cross-Service schema harvester (`dag service`) with Postman/Thunder Client support.
+- [x] Frontend / UI-UX Engine: Figma AST, HTML Wireframe & Website Inspiration Harvester.
 - [x] Multi-feature isolated workspaces & branch stacking (`dag stack`).
 
 ### 🟡 `v0.2.0-beta` (IDE Integration & Strict Type Safety)

@@ -73,6 +73,15 @@ example request and response — not just the schema._
 
 Routes, methods, request and response types.
 
+## UI/UX & Visual Contract (Frontend Features)
+
+_Plain: how the user visually perceives and interacts with this interface across all states and screen sizes._
+
+- **Component State Matrix:** Explicit definitions for [Idle, Loading, Error, Empty, Disabled] states with mandatory `data-testid` attributes.
+- **Design Tokens & Theme:** Spacing scale (padding, gap), colors, and typography scales.
+- **Responsive Constraints:** Mobile (<640px) vs Desktop (>=1024px) layout adaptations.
+- **Accessibility (A11y):** Keyboard navigation (Tab/Enter/Esc), ARIA labels, and color contrast.
+
 ## Failure semantics
 
 _Plain: what happens when this goes wrong — retried automatically, retried by

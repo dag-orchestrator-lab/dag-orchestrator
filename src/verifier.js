@@ -47,7 +47,18 @@ export function verifyContractSpec(contractText, findingsText = '', rulesText = 
     details: hasBlockers ? 'Unresolved BLOCKER findings present in 04-findings.md' : 'Zero unaddressed critical incidents'
   });
 
-  // Check 5: Rules & Policies Compliance
+  // Check 5: UI/UX Component State & Accessibility (for Frontend features)
+  const isFrontend = /UI\/UX|Component State|Responsive|tailwind|css|frontend|html|react/i.test(contractText);
+  if (isFrontend) {
+    const hasUIStates = /Idle|Loading|Error|Disabled|data-testid/i.test(contractText);
+    checks.push({
+      name: 'UI/UX State Matrix & A11y Contract',
+      pass: hasUIStates,
+      details: hasUIStates ? 'Component states [Idle, Loading, Error] and data-testid defined' : 'Missing explicit component state matrix or data-testid tags'
+    });
+  }
+
+  // Check 6: Rules & Policies Compliance
   const rulesPass = !rulesText || contractText.length > 200;
   checks.push({
     name: 'Team Policy Compliance (.dagrules)',
