@@ -1220,26 +1220,67 @@ async function main() {
 
       case '0':
       case 'refine':
+      case 'plan':
         await ensureRepoInit();
         await runStep0(args.join(' ') || await askQuestion('Enter raw feature request: '));
         break;
 
       case '1':
       case 'contract':
+      case 'spec':
         await ensureRepoInit();
         await runStep1();
         break;
 
       case '2':
       case 'layers':
+      case 'decompose':
+      case 'tasks':
         await ensureRepoInit();
         await runStep2();
         break;
 
       case '3':
-      case 'next':
+      case 'implement':
+      case 'code':
+      case 'build':
         await ensureRepoInit();
         await runStep3();
+        break;
+
+      case 'next':
+        await ensureRepoInit();
+        const pipelineStatus = getPipelineStatus();
+
+        if (!pipelineStatus.hasRequirements) {
+          logStep('Smart Pipeline Advancer: Next step is Step 0 (Requirements Refinement)');
+          await runStep0(args.join(' ') || await askQuestion('Enter raw feature request: '));
+        } else if (!pipelineStatus.hasContracts || !pipelineStatus.gate1Approved) {
+          logStep('Smart Pipeline Advancer: Next step is Step 1 (Contract & Skeptic Audit)');
+          await runStep1();
+        } else if (!pipelineStatus.hasTasks || !pipelineStatus.gate2Approved) {
+          logStep('Smart Pipeline Advancer: Next step is Step 2 (Layer Decomposition & Merge)');
+          await runStep2();
+        } else if (pipelineStatus.implementedCount < pipelineStatus.totalTasks) {
+          logStep(`Smart Pipeline Advancer: Next step is Step 3 (Task Implementation ${pipelineStatus.implementedCount + 1}/${pipelineStatus.totalTasks})`);
+          await runStep3();
+        } else if (!pipelineStatus.hasReview) {
+          logStep('Smart Pipeline Advancer: Next step is Step 4 (Full-Repo Impact Review)');
+          await runStep4();
+        } else {
+          logSuccess('All pipeline stages are 100% complete!');
+          const shipPr = await askQuestion('👉 Ship Pull Request now (`dag ship`)? [Y/n] (Default: Y): ');
+          if (!shipPr.trim() || shipPr.toLowerCase() === 'y' || shipPr.toLowerCase() === 'yes') {
+            // Trigger ship stage
+            const prTitle = args.join(' ') || (pipelineStatus.hasRequirements ? 'feat: implement feature via DAG Orchestrator' : 'feat: update feature');
+            // Delegate to ship
+            const prPath = resolveArtifactPath('PR_DESCRIPTION.md');
+            if (fs.existsSync(prPath)) {
+              execSync('which gh', { stdio: 'ignore' });
+              execSync(`gh pr create --title "${prTitle.replace(/"/g, '\\"')}" --body-file PR_DESCRIPTION.md`, { stdio: 'inherit' });
+            }
+          }
+        }
         break;
 
       case '4':
@@ -1452,13 +1493,16 @@ ${ANSI.cyan}Core Commands:${ANSI.reset}
   dag clean                Reset pipeline and backup all generated artifacts
   dag ship [title]         Bundle contract + skeptic report & open Pull Request
 
-${ANSI.cyan}Pipeline Stages:${ANSI.reset}
-  dag refine <ask>         Step 0: Decompose prompt into requirements & assumptions
-  dag contract             Step 1: Whole-repo recon -> Interface contract -> Skeptic audit [Gate 1]
-  dag layers               Step 2: Parallel 3-layer fan-out -> Merge tasks checklist [Gate 2]
-  dag next                 Step 3: Implement next task with tests-first TDD & auto-healing
-  dag review               Step 4: Whole-repo impact check & final review sign-off
-  dag run [ask]            Execute full pipeline end-to-end with gate stops
+${ANSI.cyan}Pipeline Navigation:${ANSI.reset}
+  dag next                 Smart Pipeline Advancer: Automatically detects state & executes next stage
+  dag run [ask]            Execute full pipeline end-to-end with interactive gate stops
+
+${ANSI.cyan}Explicit Pipeline Stages:${ANSI.reset}
+  dag refine (or plan)     Step 0: Decompose prompt into requirements & assumptions (--file, --context)
+  dag contract (or spec)   Step 1: Whole-repo recon -> Interface contract -> Skeptic audit [Gate 1]
+  dag layers (or tasks)    Step 2: Parallel 3-layer fan-out -> Merge tasks checklist [Gate 2]
+  dag implement (or code)  Step 3: Implement next task with tests-first TDD & auto-healing
+  dag review (or audit)    Step 4: Whole-repo impact check & final review sign-off
   dag web                  Launch optional DeepSeek Harness web dashboard
 
 ${ANSI.cyan}Flags:${ANSI.reset}

@@ -103,12 +103,13 @@ dag init
 | `dag switch <name>` | Switch active feature workspace context |
 | `dag stack [base-branch]` | Fetch base/PR branch and create a clean stacked feature branch |
 | `dag config [preset]` | Manage providers, models, and API keys (built-ins & custom presets) |
-| `dag refine "<prompt>"` | Step 0: Decompose prompt into requirements & assumptions |
-| `dag contract` | Step 1: Whole-repo recon $\to$ draft contract $\to$ skeptic audit (Gate 1) |
-| `dag layers` | Step 2: Parallel 3-layer fanout $\to$ merge `05-tasks.md` (Gate 2) |
-| `dag next` | Step 3: Implement next task with tests-first TDD & auto-healing test loop |
-| `dag review` | Step 4: Whole-repo impact check & produce `REVIEW.md` |
-| `dag run "<prompt>"` | Execute the entire pipeline end-to-end with gate stops |
+| `dag next` | Smart Pipeline Advancer: Automatically detects state & executes next stage |
+| `dag refine "<prompt>"` | Step 0: Decompose prompt into requirements & assumptions (supports `--file` and `--context`) |
+| `dag contract` (or `spec`) | Step 1: Whole-repo recon $\to$ draft contract $\to$ skeptic audit (Gate 1) |
+| `dag layers` (or `tasks`) | Step 2: Parallel 3-layer fanout $\to$ merge `05-tasks.md` (Gate 2) |
+| `dag implement` (or `code`) | Step 3: Implement next task with tests-first TDD & auto-healing test loop |
+| `dag review` (or `audit`) | Step 4: Whole-repo impact check & produce `REVIEW.md` |
+| `dag run "<prompt>"` | Execute the entire pipeline end-to-end with interactive gate stops |
 | `dag ship [title]` | Bundle spec audit trail & open GitHub Pull Request |
 | `dag rollback <step>` | Safely rewind to a previous stage with automatic backup snapshot |
 | `dag clean` | Reset pipeline and backup all generated artifacts |
