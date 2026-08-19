@@ -32,7 +32,7 @@ import { linkService, unlinkService, harvestAllLinkedServices, renderServicesLis
 import { isFrontendTask, processUIDesignReference, formatUIContractSection } from '../src/ui-design.js';
 import { banner, logStep, logSuccess, logWarning, logError, logGate, renderStatusCard, ANSI } from '../src/ui.js';
 import { getProviderForStage, executeStagePrompt } from '../src/providers/index.js';
-import { geminiPromptRefine } from '../src/gemini.js';
+import { geminiPromptRefine, geminiConsultArchitect } from '../src/gemini.js';
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -326,12 +326,14 @@ async function runStep0(featureAsk, options = {}) {
           // 2. Check if user wants on-demand recommendation / consultation
           if (trimmed === '?' || trimmed.toLowerCase().includes('recommend') || trimmed.endsWith('?') || /what do you/i.test(trimmed)) {
             logStep('Consulting Staff Architect Engine...', provider.name, provider.model);
-            const recommendation = await executeStagePrompt('refine', 
-              `The user is asking for architectural advice on this question: "${qText}".\nUser Inquiry: "${trimmed}".\nGive a concise 2-bullet trade-off comparison (Option A vs Option B) with a clear recommendation.`
-            );
-            console.log(`\n💡 ${ANSI.cyan}${ANSI.bold}Staff Architect Recommendation:${ANSI.reset}`);
-            console.log(recommendation);
-            console.log('');
+            try {
+              const recommendation = await geminiConsultArchitect(qText, trimmed);
+              console.log(`\n💡 ${ANSI.cyan}${ANSI.bold}Staff Architect Recommendation:${ANSI.reset}`);
+              console.log(recommendation);
+              console.log('');
+            } catch (err) {
+              logWarning(`Recommendation error: ${err.message}`);
+            }
             continue; // Prompt for final answer after giving recommendation
           }
 

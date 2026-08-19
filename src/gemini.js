@@ -179,6 +179,23 @@ If both lists are empty, say so explicitly and provide the full # Feature: <name
 }
 
 /**
+ * Step 0 Helper: On-demand Staff Architect consultation for inline question answering
+ */
+export async function geminiConsultArchitect(questionText, userInquiry) {
+  const systemPrompt = `You are a Senior Principal Software Architect.
+The user is answering a specific architectural question for an upcoming feature and needs a concise, direct recommendation.
+Respond in this exact, compact structure:
+• Option A: [Name] → 1-sentence trade-off
+• Option B: [Name] → 1-sentence trade-off
+• Recommendation: State exactly which option to choose and why in 1 sentence.
+
+Do NOT output '## Questions' or '## Assumptions' headers. Keep it under 6 lines total.`;
+
+  const prompt = `QUESTION BEING ANSWERED: "${questionText}"\nUSER INQUIRY: "${userInquiry}"`;
+  return await callGemini(FLASH_MODEL, systemPrompt, prompt);
+}
+
+/**
  * Step 1: Whole-Repo Reconnaissance (1M+ context ingestion)
  */
 export async function geminiRecon(featureDescription, repoContextText) {
