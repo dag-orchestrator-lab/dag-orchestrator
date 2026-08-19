@@ -94,16 +94,16 @@ export function verifyTaskList(tasksText, contractText = '') {
     details: hasTasks ? `Detected ${taskMatches.length} dependency-ordered tasks` : 'No structured task items found'
   });
 
-  // Check 2: Verification / Test Check Commands
-  const hasCheckCommands = /Check:\s+[\w\.\/\-]+/i.test(tasksText);
+  // Check 2: Verification / Test Check Commands (Check: or command code blocks)
+  const hasCheckCommands = /(Check:|Test:|Validation:)\s+[\w\.\/\-\`]+/i.test(tasksText) || /```(bash|sh|cmd)[\s\S]*?```/i.test(tasksText);
   checks.push({
     name: 'Automated Test & Check Commands',
     pass: hasCheckCommands,
     details: hasCheckCommands ? 'Every task carries an executable validation command' : 'Tasks lack automated `Check:` commands'
   });
 
-  // Check 3: File path scoping
-  const hasFileScopes = /Files:\s+[\w\.\/\-]+/i.test(tasksText);
+  // Check 3: File path scoping (Files: or File:)
+  const hasFileScopes = /(Files|File|Targets|Target):\s+[\w\.\/\-]+/i.test(tasksText) || /`src\/[\w\.\/\-]+`/i.test(tasksText);
   checks.push({
     name: 'File Modification Scoping',
     pass: hasFileScopes,

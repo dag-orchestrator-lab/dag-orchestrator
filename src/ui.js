@@ -37,7 +37,8 @@ export function banner(title) {
 
 export function logStep(stepName, runner, model) {
   const runnerTag = runner ? ` [${runner}]` : '';
-  console.log(`\n${ANSI.brightBlue}▶ [${stepName}]${ANSI.reset}${ANSI.dim}${runnerTag} Running via ${ANSI.bold}${model}${ANSI.reset}...`);
+  const modelTag = model ? ` Running via ${ANSI.bold}${model}${ANSI.reset}` : '';
+  console.log(`\n${ANSI.brightBlue}▶ [${stepName}]${ANSI.reset}${ANSI.dim}${runnerTag}${modelTag}...`);
   console.log(`${ANSI.dim}  ⏳ Working in background, please wait...${ANSI.reset}`);
 }
 

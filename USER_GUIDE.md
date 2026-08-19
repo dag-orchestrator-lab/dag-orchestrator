@@ -125,7 +125,17 @@ dag doctor
 
 ## 4. The 5-Stage Lifecycle & Daily Recipe
 
-### The Standard Feature Recipe:
+### The Universal "Smart Next" Recipe (Easiest):
+```bash
+# You can literally run `dag next` repeatedly from start to finish!
+dag next "Add recurring scheduling time windows to campaigns table" # Runs Step 0
+dag next                                                            # Runs Step 1 (Contract)
+dag next                                                            # Runs Step 2 (Layers & Tasks)
+dag next                                                            # Runs Step 3 (Task 1, 2, ...)
+dag next                                                            # Runs Step 4 (Review & Ship)
+```
+
+### The Explicit Stage Recipe:
 ```bash
 # 2. Step 0: Refine the prompt into requirements
 # Basic usage:
@@ -144,7 +154,7 @@ dag contract
 dag layers
 
 # 5. Step 3: Implement tasks one by one with TDD tests & auto-healing
-dag next
+dag implement   # or `dag code`
 
 # 6. Step 4: Full-repo impact review
 dag review

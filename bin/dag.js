@@ -32,7 +32,7 @@ import { linkService, unlinkService, harvestAllLinkedServices, renderServicesLis
 import { isFrontendTask, processUIDesignReference, formatUIContractSection } from '../src/ui-design.js';
 import { banner, logStep, logSuccess, logWarning, logError, logGate, renderStatusCard, ANSI } from '../src/ui.js';
 import { getProviderForStage, executeStagePrompt } from '../src/providers/index.js';
-import { geminiPromptRefine } from '../src/gemini.js';
+import { geminiPromptRefine, geminiConsultArchitect } from '../src/gemini.js';
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -40,6 +40,23 @@ const rl = readline.createInterface({
 });
 
 const askQuestion = query => new Promise(resolve => rl.question(query, resolve));
+
+function askMultiLine(promptText) {
+  return new Promise((resolve) => {
+    console.log(promptText);
+    console.log(`${ANSI.dim}(Paste multi-line text. Press Enter on an empty line when finished, or type 'EOF'):${ANSI.reset}`);
+    const lines = [];
+    const onLine = (line) => {
+      if (line.trim() === 'EOF' || (line === '' && lines.length > 0)) {
+        rl.removeListener('line', onLine);
+        resolve(lines.join('\n').trim());
+      } else {
+        lines.push(line);
+      }
+    };
+    rl.on('line', onLine);
+  });
+}
 
 async function ensureRepoInit(cwd = process.cwd()) {
   const config = loadConfig(cwd);
@@ -59,9 +76,8 @@ async function ensureRepoInit(cwd = process.cwd()) {
   console.log(`\n👉 Where should DAG store feature specification documents?`);
   console.log(`   ${ANSI.bold}[1] Committed with codebase${ANSI.reset} → ${ANSI.cyan}docs/features/<feature-name>/${ANSI.reset} (Default)`);
   console.log(`   ${ANSI.bold}[2] Gitignored private workspace${ANSI.reset} → ${ANSI.cyan}.dag/features/<feature-name>/${ANSI.reset}`);
-  console.log(`   ${ANSI.bold}[3] Project root directly${ANSI.reset} → ${ANSI.cyan}./ (00-requirements.md, etc.)${ANSI.reset}`);
 
-  const choice = await askQuestion('\nSelection [1/2/3] (Default: 1): ');
+  const choice = await askQuestion('\nSelection [1/2] (Default: 1): ');
   const trimmed = choice.trim();
 
   let specsDir = 'docs/features';
@@ -70,9 +86,6 @@ async function ensureRepoInit(cwd = process.cwd()) {
   if (trimmed === '2') {
     specsDir = '.dag/features';
     shouldGitignore = true;
-  } else if (trimmed === '3') {
-    specsDir = '.';
-    shouldGitignore = false;
   } else {
     specsDir = 'docs/features';
     shouldGitignore = false;
@@ -222,7 +235,7 @@ async function runStep0(featureAsk, options = {}) {
   // 3. If no flags were provided, ask the user interactively (optional)
   if (!existingContext) {
     console.log(`\n👉 ${ANSI.bold}Do you have existing architectural context, constraints, or a plan? (Optional)${ANSI.reset}`);
-    console.log(`   ${ANSI.bold}[1] ✍️ Type / paste notes & constraints${ANSI.reset}`);
+    console.log(`   ${ANSI.bold}[1] ✍️ Type / paste multi-line notes & constraints${ANSI.reset}`);
     console.log(`   ${ANSI.bold}[2] 📄 Link an existing file${ANSI.reset} (e.g. ./docs/rfc.md)`);
     console.log(`   ${ANSI.bold}[3] ⏩ None${ANSI.reset} (Let AI decompose the ask from scratch)\n`);
 
@@ -230,7 +243,7 @@ async function runStep0(featureAsk, options = {}) {
     const cleanChoice = planChoice.trim();
 
     if (cleanChoice === '1') {
-      const userNotes = await askQuestion('👉 Enter architectural notes/constraints: ');
+      const userNotes = await askMultiLine('\n👉 Enter or paste your architectural notes/constraints:');
       if (userNotes.trim()) {
         existingContext += `\n\n==================== USER ARCHITECTURAL CONSTRAINTS ====================\n${userNotes.trim()}\n========================================================================`;
         logSuccess('Loaded architectural notes!');
@@ -285,11 +298,65 @@ async function runStep0(featureAsk, options = {}) {
 
     if (questions.length > 0) {
       console.log('--- QUESTIONS NEEDING YOUR INPUT ---');
+      const deferredQuestions = [];
+
+      const resolveQuestion = async (qText, qIdx, totalCount, isDeferred = false) => {
+        const prefix = isDeferred ? `⏳ [Deferred Question ${qIdx}/${totalCount}]` : `❓ [Question ${qIdx}/${totalCount}]`;
+        console.log(`\n${prefix}`);
+        console.log(qText);
+
+        while (true) {
+          const hint = isDeferred 
+            ? '👉 Your answer (or type "?" / "recommend" for options): '
+            : '👉 Your answer (or type "?" for recommendation, "skip" to defer): ';
+          const ans = await askQuestion(`\n${hint}`);
+          const trimmed = ans.trim();
+
+          // 1. Check if user wants to defer
+          if (!isDeferred && (trimmed.toLowerCase() === 'skip' || trimmed.toLowerCase() === 'defer')) {
+            console.log(`⏳ Postponed. We will resolve this before generating requirements.\n`);
+            deferredQuestions.push(qText);
+            return;
+          }
+
+          // 2. Check if user wants on-demand recommendation / consultation
+          if (trimmed === '?' || trimmed.toLowerCase().includes('recommend') || trimmed.endsWith('?') || /what do you/i.test(trimmed)) {
+            logStep('Consulting Staff Architect Engine...', provider.name, provider.model);
+            try {
+              const recommendation = await geminiConsultArchitect(qText, trimmed);
+              console.log(`\n💡 ${ANSI.cyan}${ANSI.bold}Staff Architect Recommendation:${ANSI.reset}`);
+              console.log(recommendation);
+              console.log('');
+            } catch (err) {
+              logWarning(`Recommendation error: ${err.message}`);
+            }
+            continue; // Prompt for final answer after giving recommendation
+          }
+
+          // 3. User provided concrete answer
+          const finalAns = trimmed || 'No specific preference provided';
+          answeredQA.push(`Q: ${qText}\nA: ${finalAns}`);
+          logSuccess(`Saved decision: "${finalAns}"`);
+          return;
+        }
+      };
+
+      // First pass through questions
       for (let i = 0; i < questions.length; i++) {
-        console.log(`\n❓ [Question ${i + 1}/${questions.length}]`);
-        console.log(questions[i]);
-        const ans = await askQuestion('\n👉 Your answer: ');
-        answeredQA.push(`Q: ${questions[i]}\nA: ${ans || 'No specific preference provided'}`);
+        await resolveQuestion(questions[i], i + 1, questions.length, false);
+      }
+
+      // Replay deferred questions queue
+      if (deferredQuestions.length > 0) {
+        console.log(`\n${ANSI.yellow}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+        console.log(`│ ⏳ RESOLVING DEFERRED QUESTIONS (${deferredQuestions.length} remaining)                      │`);
+        console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
+        console.log(`│ An explicit decision is required before drafting 00-requirements.md│`);
+        console.log(`${ANSI.yellow}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}`);
+
+        for (let j = 0; j < deferredQuestions.length; j++) {
+          await resolveQuestion(deferredQuestions[j], j + 1, deferredQuestions.length, true);
+        }
       }
     }
 
@@ -307,7 +374,15 @@ async function runStep0(featureAsk, options = {}) {
         } else if (trimmed.toLowerCase() === 'n' || trimmed.toLowerCase() === 'no') {
           confirmation = 'Rejected (No)';
         } else if (/^(yes|y)\b/i.test(trimmed)) {
-          confirmation = `Confirmed with additional constraints: ${trimmed.replace(/^(yes|y)[,\s\.\-]+/i, '')}`;
+          const extraConstraints = trimmed.replace(/^(yes|y)[,\s\.\-]+/i, '');
+          confirmation = `Confirmed with additional constraints: ${extraConstraints}`;
+          
+          // Auto-save to .dagrules if user mentions dagrules
+          if (/dagrules|\.dagrules|save as rule|team policy/i.test(trimmed)) {
+            const ruleText = assumptions[i].replace(/^I'm assuming (that )?/i, '').replace(/ — correct\?.*$/i, '');
+            const res = appendLearnedRule(ruleText, 'TypeScript Policy');
+            if (res.updated) logSuccess(`Saved permanent policy to ${res.path}`);
+          }
         } else if (/^(no|n)\b/i.test(trimmed)) {
           confirmation = `Rejected with reason: ${trimmed.replace(/^(no|n)[,\s\.\-]+/i, '')}`;
         } else {
@@ -531,8 +606,23 @@ async function runStep2() {
     logSuccess(`Updated ${tasksPath}`);
 
     // Pre-Flight Verifier Audit (Gate 2)
-    const taskVerifierReport = verifyTaskList(mergedTasks, contractText);
+    let taskVerifierReport = verifyTaskList(mergedTasks, contractText);
     renderVerificationReport(taskVerifierReport);
+
+    // Single-shot deterministic auto-heal (Capped at exactly 1 attempt)
+    if (!taskVerifierReport.isReady && !currentTasksFeedback) {
+      logStep('Pre-Flight Verifier: Minor checklist omissions detected. Applying 1-shot auto-correction...', mergeProvider.name, mergeProvider.model);
+      const failedRules = taskVerifierReport.checks.filter(c => !c.pass).map(c => `- ${c.name}: ${c.details}`).join('\n');
+      const healedTasks = await executeStagePrompt('merge', '', '', {
+        contractText,
+        layerPlans: { domain: domainPlan, appInfra: appInfraPlan, data: dataPlan },
+        findingsText: `${layerFindings}\n\nMANDATORY VERIFIER FIX RULES (Every task MUST include explicit Files: and Check: test commands):\n${failedRules}`,
+        cwd: process.cwd()
+      });
+      fs.writeFileSync(tasksPath, healedTasks);
+      taskVerifierReport = verifyTaskList(healedTasks, contractText);
+      renderVerificationReport(taskVerifierReport);
+    }
 
     const autoGate = process.argv.includes('--auto-gate');
     if (autoGate && taskVerifierReport.isReady) {
@@ -1111,9 +1201,54 @@ async function main() {
             }
           }
         } else if (subCmd === 'set' && key && val) {
+          const oldSpecsDir = config.SPECS_DIR || 'docs/features';
           saveConfig({ [key]: val });
           saveLocalConfig({ [key]: val });
           logSuccess(`Set ${key}=${val}`);
+
+          // If SPECS_DIR changed, check if existing feature folders should be migrated
+          if (key === 'SPECS_DIR' && val !== oldSpecsDir) {
+            const oldBasePath = path.join(process.cwd(), oldSpecsDir);
+            const newBasePath = path.join(process.cwd(), val);
+
+            if (fs.existsSync(oldBasePath)) {
+              const featuresToMove = fs.readdirSync(oldBasePath)
+                .filter(f => fs.statSync(path.join(oldBasePath, f)).isDirectory());
+
+              if (featuresToMove.length > 0) {
+                console.log(`\n📦 Found ${featuresToMove.length} feature workspace(s) in "${oldSpecsDir}":`);
+                for (const feat of featuresToMove) {
+                  console.log(`   • ${feat}`);
+                }
+                const moveAns = await askQuestion(`\n👉 Move these feature workspaces to the new location ("${val}")? [Y/n] (Default: Y): `);
+                const trimmed = moveAns.trim().toLowerCase();
+                if (!trimmed || trimmed === 'y' || trimmed === 'yes') {
+                  if (!fs.existsSync(newBasePath)) {
+                    fs.mkdirSync(newBasePath, { recursive: true });
+                  }
+                  for (const feat of featuresToMove) {
+                    const srcPath = path.join(oldBasePath, feat);
+                    const destPath = path.join(newBasePath, feat);
+                    fs.renameSync(srcPath, destPath);
+                  }
+                  logSuccess(`Successfully migrated ${featuresToMove.length} feature workspace(s) to "${val}"!`);
+
+                  // Add to .gitignore if moving to .dag/
+                  if (val.startsWith('.dag')) {
+                    const gitignorePath = path.join(process.cwd(), '.gitignore');
+                    if (fs.existsSync(gitignorePath)) {
+                      let gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
+                      if (!gitignoreContent.includes('.dag/')) {
+                        gitignoreContent += '\n# DAG Orchestrator workspace and local backups\n.dag/\n';
+                        fs.writeFileSync(gitignorePath, gitignoreContent);
+                        logSuccess('Added .dag/ to .gitignore');
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
         } else if (subCmd === 'get' && key) {
           console.log(`${key}=${config[key] || 'not set'}`);
         } else {
@@ -1141,26 +1276,67 @@ async function main() {
 
       case '0':
       case 'refine':
+      case 'plan':
         await ensureRepoInit();
         await runStep0(args.join(' ') || await askQuestion('Enter raw feature request: '));
         break;
 
       case '1':
       case 'contract':
+      case 'spec':
         await ensureRepoInit();
         await runStep1();
         break;
 
       case '2':
       case 'layers':
+      case 'decompose':
+      case 'tasks':
         await ensureRepoInit();
         await runStep2();
         break;
 
       case '3':
-      case 'next':
+      case 'implement':
+      case 'code':
+      case 'build':
         await ensureRepoInit();
         await runStep3();
+        break;
+
+      case 'next':
+        await ensureRepoInit();
+        const pipelineStatus = getPipelineStatus();
+
+        if (!pipelineStatus.hasRequirements) {
+          logStep('Smart Pipeline Advancer: Next step is Step 0 (Requirements Refinement)');
+          await runStep0(args.join(' ') || await askQuestion('Enter raw feature request: '));
+        } else if (!pipelineStatus.hasContracts || !pipelineStatus.gate1Approved) {
+          logStep('Smart Pipeline Advancer: Next step is Step 1 (Contract & Skeptic Audit)');
+          await runStep1();
+        } else if (!pipelineStatus.hasTasks || !pipelineStatus.gate2Approved) {
+          logStep('Smart Pipeline Advancer: Next step is Step 2 (Layer Decomposition & Merge)');
+          await runStep2();
+        } else if (pipelineStatus.implementedCount < pipelineStatus.totalTasks) {
+          logStep(`Smart Pipeline Advancer: Next step is Step 3 (Task Implementation ${pipelineStatus.implementedCount + 1}/${pipelineStatus.totalTasks})`);
+          await runStep3();
+        } else if (!pipelineStatus.hasReview) {
+          logStep('Smart Pipeline Advancer: Next step is Step 4 (Full-Repo Impact Review)');
+          await runStep4();
+        } else {
+          logSuccess('All pipeline stages are 100% complete!');
+          const shipPr = await askQuestion('👉 Ship Pull Request now (`dag ship`)? [Y/n] (Default: Y): ');
+          if (!shipPr.trim() || shipPr.toLowerCase() === 'y' || shipPr.toLowerCase() === 'yes') {
+            // Trigger ship stage
+            const prTitle = args.join(' ') || (pipelineStatus.hasRequirements ? 'feat: implement feature via DAG Orchestrator' : 'feat: update feature');
+            // Delegate to ship
+            const prPath = resolveArtifactPath('PR_DESCRIPTION.md');
+            if (fs.existsSync(prPath)) {
+              execSync('which gh', { stdio: 'ignore' });
+              execSync(`gh pr create --title "${prTitle.replace(/"/g, '\\"')}" --body-file PR_DESCRIPTION.md`, { stdio: 'inherit' });
+            }
+          }
+        }
         break;
 
       case '4':
@@ -1354,23 +1530,6 @@ ${ANSI.cyan}Examples:${ANSI.reset}
   dag service link billing ../billing-service
   dag service link notifications ../packages/notifications
           `);
-        } else if (helpTopic === 'refine' || helpTopic === 'step0') {
-          console.log(`
-${ANSI.bold}DAG CLI Help: Step 0 Requirements Refinement & Plan Ingestion${ANSI.reset}
-
-${ANSI.cyan}Usage:${ANSI.reset}
-  dag refine <feature-ask> [flags]
-
-${ANSI.cyan}Flags for Pre-Existing Plans & Context:${ANSI.reset}
-  --file=<path>            Ingest an existing RFC, technical plan, or markdown spec (e.g. --file=docs/rfc.md)
-  --plan=<path>            Alias for --file
-  --context="<text>"       Provide inline architectural notes, database constraints, or tech stack requirements
-
-${ANSI.cyan}Examples:${ANSI.reset}
-  dag refine "Add campaign scheduler" --context="Use PostgreSQL tsrange, UUIDv7, and Redis locks"
-  dag refine "Migrate auth to JWT" --file=docs/plans/auth-v2.md
-  dag refine "Build date-picker component" # Launches interactive UI reference wizard
-          `);
         } else {
           console.log(`
 ${ANSI.bold}DAG CLI - Universal Model-Agnostic & Harness-Agnostic Pipeline (v0.1.0-alpha)${ANSI.reset}
@@ -1390,22 +1549,23 @@ ${ANSI.cyan}Core Commands:${ANSI.reset}
   dag clean                Reset pipeline and backup all generated artifacts
   dag ship [title]         Bundle contract + skeptic report & open Pull Request
 
-${ANSI.cyan}Pipeline Stages:${ANSI.reset}
-  dag refine <ask>         Step 0: Decompose prompt into requirements & assumptions (--file, --context)
-  dag contract             Step 1: Whole-repo recon -> Interface contract -> Skeptic audit [Gate 1]
-  dag layers               Step 2: Parallel 3-layer fan-out -> Merge tasks checklist [Gate 2]
-  dag next                 Step 3: Implement next task with tests-first TDD & auto-healing
-  dag review               Step 4: Whole-repo impact check & final review sign-off
-  dag run [ask]            Execute full pipeline end-to-end with gate stops
+${ANSI.cyan}Pipeline Navigation:${ANSI.reset}
+  dag next                 Smart Pipeline Advancer: Automatically detects state & executes next stage
+  dag run [ask]            Execute full pipeline end-to-end with interactive gate stops
+
+${ANSI.cyan}Explicit Pipeline Stages:${ANSI.reset}
+  dag refine (or plan)     Step 0: Decompose prompt into requirements & assumptions (--file, --context)
+  dag contract (or spec)   Step 1: Whole-repo recon -> Interface contract -> Skeptic audit [Gate 1]
+  dag layers (or tasks)    Step 2: Parallel 3-layer fan-out -> Merge tasks checklist [Gate 2]
+  dag implement (or code)  Step 3: Implement next task with tests-first TDD & auto-healing
+  dag review (or audit)    Step 4: Whole-repo impact check & final review sign-off
   dag web                  Launch optional DeepSeek Harness web dashboard
 
 ${ANSI.cyan}Flags:${ANSI.reset}
-  --file=<path>            Ingest pre-existing RFC or architecture plan into Step 0
-  --context="<text>"       Inject inline technical constraints into Step 0
   --json                   Output machine-readable JSON for CI/CD and IDE extensions
   --auto-gate              Allow Pre-Flight Verifier to auto-approve gates if 100% passing
 
-${ANSI.dim}Run \`dag help <command>\` for detailed command guidance (e.g. \`dag help refine\`, \`dag help config\`).${ANSI.reset}
+${ANSI.dim}Run \`dag help <command>\` for detailed command guidance (e.g. \`dag help config\`, \`dag help stack\`).${ANSI.reset}
           `);
         }
         break;
