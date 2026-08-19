@@ -81,6 +81,52 @@ async function ensureRepoInit(cwd = process.cwd()) {
     }
   }
 
+  // Ensure dsh.config.yaml exists in the repository for DeepSeek Harness users
+  const dshConfigPath = path.join(cwd, 'dsh.config.yaml');
+  if (!fs.existsSync(dshConfigPath)) {
+    const defaultDshYaml = `# DeepSeek Harness (dsh) Multi-Agent Configuration
+version: "1.0"
+
+models:
+  gemini-flash:
+    provider: google-ai-studio
+    model: gemini-3.6-flash
+  gemini-pro:
+    provider: google-ai-studio
+    model: gemini-3.6-pro
+    api_key: "\${GEMINI_API_KEY}"
+    thinking_budget: 4096
+  claude-code:
+    provider: cli
+    command: "claude -p"
+
+workflow:
+  step_0_refine:
+    model: gemini-flash
+    artifact: "00-requirements.md"
+  step_1_contract:
+    recon_model: gemini-pro
+    spec_model: claude-code
+    skeptic_model: gemini-pro
+    gate: "Gate 1 (Human Approval)"
+    artifact: "02-contracts.md"
+  step_2_layers:
+    fanout_model: gemini-flash
+    merger_model: claude-code
+    gate: "Gate 2 (Conflict Resolution)"
+    artifact: "05-tasks.md"
+  step_3_implement:
+    coding_model: claude-code
+    conformance_model: gemini-flash
+    artifact: "DIFF.patch"
+  step_4_review:
+    impact_model: gemini-pro
+    review_model: claude-code
+`;
+    fs.writeFileSync(dshConfigPath, defaultDshYaml);
+    logSuccess('Created default dsh.config.yaml (DeepSeek Harness)');
+  }
+
   saveLocalConfig({ SPECS_DIR: specsDir }, cwd);
   logSuccess(`Saved repository configuration! Feature specs will live in: ${specsDir}\n`);
   return loadConfig(cwd);
