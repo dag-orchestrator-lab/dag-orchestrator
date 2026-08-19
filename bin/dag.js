@@ -5,7 +5,16 @@ import path from 'node:path';
 import readline from 'node:readline';
 import { execSync, spawn } from 'node:child_process';
 
-import { loadConfig, saveConfig, applyPreset, saveLocalConfig, listPresets, saveCustomPreset } from '../src/config.js';
+import { 
+  loadConfig, 
+  saveConfig, 
+  saveLocalConfig, 
+  applyPreset, 
+  listPresets, 
+  saveCustomPreset,
+  setHarnessRunner,
+  listHarnesses 
+} from '../src/config.js';
 import { 
   getPipelineStatus, 
   createRollbackSnapshot, 
@@ -965,6 +974,28 @@ async function main() {
             applyPreset(key);
             logSuccess(`Applied preset: ${key}`);
           }
+        } else if (subCmd === 'harness') {
+          if (!key) {
+            const harnesses = listHarnesses();
+            console.log(`\n${ANSI.cyan}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+            console.log(`│ 🚀 DAG EXECUTION HARNESS RUNNERS                                   │`);
+            console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
+            for (const h of harnesses) {
+              const isCurrent = (config.DEFAULT_HARNESS || 'standalone') === h.name;
+              const tag = isCurrent ? `${ANSI.brightGreen}* ACTIVE${ANSI.reset}` : '        ';
+              console.log(`│ ${tag} ${ANSI.bold}${h.name.padEnd(12)}${ANSI.reset} → ${ANSI.dim}${h.desc.padEnd(46)}${ANSI.reset} │`);
+            }
+            console.log(`${ANSI.cyan}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}\n`);
+            console.log(`Usage:`);
+            console.log(`  dag config harness <name>        Switch execution harness (standalone | dsh | headless)\n`);
+          } else {
+            try {
+              const chosen = setHarnessRunner(key);
+              logSuccess(`Switched execution harness to: "${chosen}"`);
+            } catch (err) {
+              logError(err.message);
+            }
+          }
         } else if (subCmd === 'set' && key && val) {
           saveConfig({ [key]: val });
           saveLocalConfig({ [key]: val });
@@ -1160,16 +1191,19 @@ ${ANSI.bold}DAG CLI Help: Provider Presets & Configuration${ANSI.reset}
 
 ${ANSI.cyan}Usage:${ANSI.reset}
   dag config                           Display active environment configuration
-  dag config preset                    List built-in and custom presets
-  dag config preset <name>             Switch active preset (gemini | claude | deepseek | local | hybrid)
+  dag config harness                   List execution harness runners (standalone | dsh | headless)
+  dag config harness <name>            Switch execution harness runner
+  dag config preset                    List built-in and custom model presets
+  dag config preset <name>             Switch active model preset (gemini | claude | deepseek | local | hybrid)
   dag config preset create [name]      Interactive wizard to build a custom stage-to-model mapping
   dag config set <KEY> <VALUE>         Set global configuration variable
   dag config get <KEY>                 Get value of configuration variable
 
 ${ANSI.cyan}Examples:${ANSI.reset}
-  dag config preset hybrid
+  dag config harness standalone        # Lightweight CLI mode with ANSI cards
+  dag config harness dsh               # Orchestrate via DeepSeek Harness
+  dag config preset hybrid             # Gemini 1M+ Context + Claude Coding
   dag config preset create my-team-stack
-  dag config set BENCHMARK_MODELS "claude-sonnet-5,gpt-4o,deepseek-chat"
           `);
         } else if (helpTopic === 'stack') {
           console.log(`

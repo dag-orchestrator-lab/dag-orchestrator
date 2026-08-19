@@ -240,5 +240,94 @@ export function applyPreset(presetName, cwd = process.cwd()) {
 
   saveConfig(updates);
   saveLocalConfig(updates, cwd);
+  syncDshConfig(cwd);
   return updates;
+}
+
+export function listHarnesses() {
+  return [
+    { name: 'standalone', desc: 'Native lightweight DAG CLI runner with ANSI status cards (Default)' },
+    { name: 'dsh', desc: 'DeepSeek Harness process orchestrator & web UI runner' },
+    { name: 'headless', desc: 'Zero-prompt JSON runner for CI/CD pipelines & background actions' }
+  ];
+}
+
+export function setHarnessRunner(harnessName, cwd = process.cwd()) {
+  const lower = harnessName.toLowerCase();
+  const valid = ['standalone', 'dsh', 'headless'];
+  if (!valid.includes(lower)) {
+    throw new Error(`Invalid harness: "${harnessName}". Supported: ${valid.join(', ')}`);
+  }
+  const updates = { DEFAULT_HARNESS: lower };
+  saveConfig(updates);
+  saveLocalConfig(updates, cwd);
+  return lower;
+}
+
+export function syncDshConfig(cwd = process.cwd()) {
+  const config = loadConfig(cwd);
+  const dshPath = path.join(cwd, 'dsh.config.yaml');
+  
+  const stageToDshModel = (provider) => {
+    switch (provider) {
+      case 'gemini': return 'gemini-pro';
+      case 'claude': return 'claude-code';
+      case 'openai': return 'deepseek-chat';
+      case 'ollama': return 'ollama-local';
+      default: return 'gemini-flash';
+    }
+  };
+
+  const yamlContent = `# DeepSeek Harness (dsh) Multi-Agent Configuration
+# Automatically synchronized with DAG config
+version: "1.0"
+
+models:
+  gemini-flash:
+    provider: google-ai-studio
+    model: ${config.GEMINI_FLASH_MODEL || 'gemini-3.6-flash'}
+  gemini-pro:
+    provider: google-ai-studio
+    model: ${config.GEMINI_PRO_MODEL || 'gemini-3.6-pro'}
+    api_key: "\${GEMINI_API_KEY}"
+    thinking_budget: 4096
+  claude-code:
+    provider: cli
+    command: "claude -p"
+  deepseek-chat:
+    provider: openai-compatible
+    base_url: "${config.OPENAI_BASE_URL || 'https://api.deepseek.com/v1'}"
+    model: "${config.OPENAI_MODEL || 'deepseek-chat'}"
+  ollama-local:
+    provider: openai-compatible
+    base_url: "${config.OLLAMA_BASE_URL || 'http://localhost:11434/v1'}"
+    model: "${config.OLLAMA_MODEL || 'qwen2.5-coder:latest'}"
+
+workflow:
+  step_0_refine:
+    model: ${stageToDshModel(config.PROVIDER_REFINE)}
+    artifact: "00-requirements.md"
+  step_1_contract:
+    recon_model: ${stageToDshModel(config.PROVIDER_RECON)}
+    spec_model: ${stageToDshModel(config.PROVIDER_CONTRACT)}
+    skeptic_model: ${stageToDshModel(config.PROVIDER_SKEPTIC)}
+    gate: "Gate 1 (Human Approval)"
+    artifact: "02-contracts.md"
+  step_2_layers:
+    fanout_model: ${stageToDshModel(config.PROVIDER_LAYERS)}
+    merger_model: ${stageToDshModel(config.PROVIDER_MERGE)}
+    gate: "Gate 2 (Conflict Resolution)"
+    artifact: "05-tasks.md"
+  step_3_implement:
+    coding_model: ${stageToDshModel(config.PROVIDER_CODING)}
+    conformance_model: ${stageToDshModel(config.PROVIDER_CONFORMANCE)}
+    artifact: "DIFF.patch"
+  step_4_review:
+    impact_model: ${stageToDshModel(config.PROVIDER_REVIEW)}
+    review_model: ${stageToDshModel(config.PROVIDER_REVIEW)}
+`;
+
+  try {
+    fs.writeFileSync(dshPath, yamlContent);
+  } catch (e) {}
 }

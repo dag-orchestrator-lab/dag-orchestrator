@@ -32,7 +32,24 @@ cd dag-orchestrator
 npm link
 ```
 
-### Step 2: Configure Your Preferred Provider Preset
+### Step 2: Choose Your Execution Harness Runner (Optional)
+DAG cleanly separates the **Execution Harness Runner** from the **Model Provider Preset**:
+
+```bash
+# View available harness runners:
+dag config harness
+
+# Option A: Lightweight standalone CLI runner with ANSI cards (Default)
+dag config harness standalone
+
+# Option B: DeepSeek Harness process orchestrator & web UI runner
+dag config harness dsh
+
+# Option C: Zero-prompt headless JSON runner for CI/CD
+dag config harness headless
+```
+
+### Step 3: Configure Your Preferred Model Provider Preset
 ```bash
 # Option A: 100% Free Google AI Studio
 dag config preset gemini
@@ -53,7 +70,7 @@ dag config set OPENAI_API_KEY "your-deepseek-key"
 dag config preset local
 ```
 
-### Step 3: Initialize in Your Project Repository
+### Step 4: Initialize in Your Project Repository
 Run `dag init` inside your target project directory:
 ```bash
 cd /path/to/my-project

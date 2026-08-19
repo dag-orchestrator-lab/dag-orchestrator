@@ -62,21 +62,23 @@ cd dag-orchestrator
 npm link
 ```
 
-### 2. Configure Your Preferred Preset
-DAG is **100% provider-agnostic and harness-agnostic**. You can use one of the built-in presets or create your own custom stack:
+### 2. Configure Harness Runner & Model Provider Preset
+DAG cleanly decouples the **Execution Harness Runner** from the **Model Provider Preset**:
 
 ```bash
-# Option A: Create your own Custom Stage-to-Model Preset
+# 1. Execution Harness Runner (Default: standalone)
+dag config harness standalone   # Lightweight CLI runner with ANSI cards
+dag config harness dsh          # DeepSeek Harness process engine & web UI
+
+# 2. Model Provider Preset (Default: hybrid)
+dag config preset hybrid        # Gemini 1M+ Context + Claude Coding
+dag config preset claude        # 100% Claude Subscription (Zero external API keys)
+dag config preset gemini        # 100% Google AI Studio (Free or Enterprise)
+dag config preset deepseek      # 100% DeepSeek / OpenAI API endpoint
+dag config preset local         # 100% Air-Gapped / Offline via Ollama
+
+# Or build your own custom stage-to-model stack:
 dag config preset create my-team-stack
-
-# Option B: Built-in Single-Provider Presets
-dag config preset claude      # 100% Claude Subscription (Zero external API keys)
-dag config preset gemini      # 100% Google AI Studio (Free or Enterprise)
-dag config preset deepseek    # 100% DeepSeek / OpenAI API endpoint
-dag config preset local       # 100% Air-Gapped / Offline via Ollama
-
-# Option C: Example Multi-Provider Hybrid Preset (Gemini 1M+ Scans + Claude Coding)
-dag config preset hybrid
 ```
 
 ### 3. Initialize in Your Repository
