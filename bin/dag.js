@@ -606,8 +606,23 @@ async function runStep2() {
     logSuccess(`Updated ${tasksPath}`);
 
     // Pre-Flight Verifier Audit (Gate 2)
-    const taskVerifierReport = verifyTaskList(mergedTasks, contractText);
+    let taskVerifierReport = verifyTaskList(mergedTasks, contractText);
     renderVerificationReport(taskVerifierReport);
+
+    // Single-shot deterministic auto-heal (Capped at exactly 1 attempt)
+    if (!taskVerifierReport.isReady && !currentTasksFeedback) {
+      logStep('Pre-Flight Verifier: Minor checklist omissions detected. Applying 1-shot auto-correction...', mergeProvider.name, mergeProvider.model);
+      const failedRules = taskVerifierReport.checks.filter(c => !c.pass).map(c => `- ${c.name}: ${c.details}`).join('\n');
+      const healedTasks = await executeStagePrompt('merge', '', '', {
+        contractText,
+        layerPlans: { domain: domainPlan, appInfra: appInfraPlan, data: dataPlan },
+        findingsText: `${layerFindings}\n\nMANDATORY VERIFIER FIX RULES (Every task MUST include explicit Files: and Check: test commands):\n${failedRules}`,
+        cwd: process.cwd()
+      });
+      fs.writeFileSync(tasksPath, healedTasks);
+      taskVerifierReport = verifyTaskList(healedTasks, contractText);
+      renderVerificationReport(taskVerifierReport);
+    }
 
     const autoGate = process.argv.includes('--auto-gate');
     if (autoGate && taskVerifierReport.isReady) {

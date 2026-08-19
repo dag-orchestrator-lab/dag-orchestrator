@@ -1,4 +1,0 @@
-BLOCKER — Unported provider modules break TypeScript compilation and runtime imports from `dist/`
-Trigger: Running `npm run build`, `npm run typecheck`, or executing the compiled CLI (`dist/bin/dag.js`) while `src/providers/index.js` and `src/providers/openai.js` remain unported `.js` files imported by typed engine modules (`src/services.ts`).
-Consequence: `tsc --noEmit` fails under `strict: true` with TS2307 (`Cannot find module or its corresponding type declarations`), violating the Compile Invariant. Furthermore, standard `tsc` compilation emits only `.ts` sources into `dist/`, leaving `dist/providers/index.js` missing and causing `dag` CLI executions to crash at runtime with `ERR_MODULE_NOT_FOUND`.
-Fix: Include `src/providers/index.js` and `src/providers/openai.js` in the Phase 4 porting scope, or provide ambient `.d.ts` declarations and add a file-copy step to `npm run build` for untranspiled `.js` assets.
