@@ -219,6 +219,39 @@ async function runStep0(featureAsk, options = {}) {
     logSuccess('Loaded inline architectural constraints');
   }
 
+  // 3. If no flags were provided, ask the user interactively (optional)
+  if (!existingContext) {
+    console.log(`\n👉 ${ANSI.bold}Do you have existing architectural context, constraints, or a plan? (Optional)${ANSI.reset}`);
+    console.log(`   ${ANSI.bold}[1] ✍️ Type / paste notes & constraints${ANSI.reset}`);
+    console.log(`   ${ANSI.bold}[2] 📄 Link an existing file${ANSI.reset} (e.g. ./docs/rfc.md)`);
+    console.log(`   ${ANSI.bold}[3] ⏩ None${ANSI.reset} (Let AI decompose the ask from scratch)\n`);
+
+    const planChoice = await askQuestion('Selection [1/2/3] (Default: 3): ');
+    const cleanChoice = planChoice.trim();
+
+    if (cleanChoice === '1') {
+      const userNotes = await askQuestion('👉 Enter architectural notes/constraints: ');
+      if (userNotes.trim()) {
+        existingContext += `\n\n==================== USER ARCHITECTURAL CONSTRAINTS ====================\n${userNotes.trim()}\n========================================================================`;
+        logSuccess('Loaded architectural notes!');
+      }
+    } else if (cleanChoice === '2') {
+      const filePath = await askQuestion('👉 Enter path to RFC / plan file: ');
+      const cleanPath = filePath.trim();
+      if (cleanPath && fs.existsSync(cleanPath)) {
+        try {
+          const fileContent = fs.readFileSync(cleanPath, 'utf8').trim();
+          existingContext += `\n\n==================== PRE-EXISTING PLAN / RFC (${path.basename(cleanPath)}) ====================\n${fileContent}\n================================================================================`;
+          logSuccess(`Ingested pre-existing plan from ${cleanPath}!`);
+        } catch (e) {
+          logWarning(`Could not read plan file: ${e.message}`);
+        }
+      } else if (cleanPath) {
+        logWarning(`File not found: ${cleanPath}. Proceeding with standard refinement.`);
+      }
+    }
+  }
+
   // Strip flags from feature ask string
   const cleanAsk = featureAsk
     .replace(/--(file|plan|context)=("[^"]*"|'[^']*'|[^\s]+)/gi, '')
