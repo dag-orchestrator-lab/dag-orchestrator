@@ -378,7 +378,15 @@ async function runStep0(featureAsk, options = {}) {
         } else if (trimmed.toLowerCase() === 'n' || trimmed.toLowerCase() === 'no') {
           confirmation = 'Rejected (No)';
         } else if (/^(yes|y)\b/i.test(trimmed)) {
-          confirmation = `Confirmed with additional constraints: ${trimmed.replace(/^(yes|y)[,\s\.\-]+/i, '')}`;
+          const extraConstraints = trimmed.replace(/^(yes|y)[,\s\.\-]+/i, '');
+          confirmation = `Confirmed with additional constraints: ${extraConstraints}`;
+          
+          // Auto-save to .dagrules if user mentions dagrules
+          if (/dagrules|\.dagrules|save as rule|team policy/i.test(trimmed)) {
+            const ruleText = assumptions[i].replace(/^I'm assuming (that )?/i, '').replace(/ — correct\?.*$/i, '');
+            const res = appendLearnedRule(ruleText, 'TypeScript Policy');
+            if (res.updated) logSuccess(`Saved permanent policy to ${res.path}`);
+          }
         } else if (/^(no|n)\b/i.test(trimmed)) {
           confirmation = `Rejected with reason: ${trimmed.replace(/^(no|n)[,\s\.\-]+/i, '')}`;
         } else {
