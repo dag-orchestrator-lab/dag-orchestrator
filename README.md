@@ -53,10 +53,13 @@ Most AI coding assistants rely on unconstrained conversational memory, leading t
 
 ### 1. Installation
 ```bash
-# Global Install via npm or git:
-npm install -g git+https://github.com/your-org/dag-harness.git
-# Or install tarball directly:
-npm install -g dag-harness-1.0.0.tgz
+# Global Install via GitHub:
+npm install -g git+https://github.com/dag-orchestrator-lab/dag-orchestrator.git
+
+# Or install from cloned repo:
+git clone https://github.com/dag-orchestrator-lab/dag-orchestrator.git
+cd dag-orchestrator
+npm link
 ```
 
 ### 2. Configure Your Preferred Preset

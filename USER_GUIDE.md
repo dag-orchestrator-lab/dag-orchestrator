@@ -23,11 +23,12 @@
 
 ### Step 1: Install DAG Globally
 ```bash
-# Option A: Install from local tarball:
-npm install -g dag-orchestrator-0.1.0-alpha.tgz
+# Option A: Install directly via GitHub:
+npm install -g git+https://github.com/dag-orchestrator-lab/dag-orchestrator.git
 
-# Option B: Link directly from source repository:
-cd /path/to/dag-harness
+# Option B: Clone and link locally:
+git clone https://github.com/dag-orchestrator-lab/dag-orchestrator.git
+cd dag-orchestrator
 npm link
 ```
 
