@@ -41,6 +41,23 @@ const rl = readline.createInterface({
 
 const askQuestion = query => new Promise(resolve => rl.question(query, resolve));
 
+function askMultiLine(promptText) {
+  return new Promise((resolve) => {
+    console.log(promptText);
+    console.log(`${ANSI.dim}(Paste multi-line text. Press Enter on an empty line when finished, or type 'EOF'):${ANSI.reset}`);
+    const lines = [];
+    const onLine = (line) => {
+      if (line.trim() === 'EOF' || (line === '' && lines.length > 0)) {
+        rl.removeListener('line', onLine);
+        resolve(lines.join('\n').trim());
+      } else {
+        lines.push(line);
+      }
+    };
+    rl.on('line', onLine);
+  });
+}
+
 async function ensureRepoInit(cwd = process.cwd()) {
   const config = loadConfig(cwd);
   const localConfigPath = path.join(cwd, '.dag', 'config.json');
@@ -191,15 +208,94 @@ function parseRefinementItems(text) {
   return { questions, assumptions };
 }
 
-async function runStep0(featureAsk) {
+async function runStep0(featureAsk, options = {}) {
   banner('STEP 0: REFINE THE RAW ASK');
   const provider = getProviderForStage('refine');
+
+  let existingContext = '';
+
+  // 1. Check for --file or --plan flag
+  const fileArg = process.argv.find(a => a.startsWith('--file=') || a.startsWith('--plan='));
+  const targetFile = fileArg ? fileArg.split('=')[1].trim() : (options.file || options.plan || '');
+
+  if (targetFile && fs.existsSync(targetFile)) {
+    try {
+      const fileContent = fs.readFileSync(targetFile, 'utf8').trim();
+      existingContext += `\n\n==================== PRE-EXISTING PLAN / RFC (${path.basename(targetFile)}) ====================\n${fileContent}\n================================================================================`;
+      logSuccess(`Ingested pre-existing architecture plan from ${targetFile}`);
+    } catch (e) {
+      logWarning(`Could not read plan file: ${e.message}`);
+    }
+  }
+
+  // 2. Check for inline --context flag
+  const contextArg = process.argv.find(a => a.startsWith('--context='));
+  if (contextArg) {
+    const rawCtx = contextArg.slice(10).replace(/^["']|["']$/g, '');
+    existingContext += `\n\n==================== USER ARCHITECTURAL CONSTRAINTS ====================\n${rawCtx}\n========================================================================`;
+    logSuccess('Loaded inline architectural constraints');
+  }
+
+  // 3. If no flags were provided, ask the user interactively (optional)
+  if (!existingContext) {
+    console.log(`\n👉 ${ANSI.bold}Do you have existing architectural context, constraints, or a plan? (Optional)${ANSI.reset}`);
+    console.log(`   ${ANSI.bold}[1] ✍️ Type / paste multi-line notes & constraints${ANSI.reset}`);
+    console.log(`   ${ANSI.bold}[2] 📄 Link an existing file${ANSI.reset} (e.g. ./docs/rfc.md)`);
+    console.log(`   ${ANSI.bold}[3] ⏩ None${ANSI.reset} (Let AI decompose the ask from scratch)\n`);
+
+    const planChoice = await askQuestion('Selection [1/2/3] (Default: 3): ');
+    const cleanChoice = planChoice.trim();
+
+    if (cleanChoice === '1') {
+      const userNotes = await askMultiLine('\n👉 Enter or paste your architectural notes/constraints:');
+      if (userNotes.trim()) {
+        existingContext += `\n\n==================== USER ARCHITECTURAL CONSTRAINTS ====================\n${userNotes.trim()}\n========================================================================`;
+        logSuccess('Loaded architectural notes!');
+      }
+    } else if (cleanChoice === '2') {
+      let fileLoaded = false;
+      while (!fileLoaded) {
+        const filePath = await askQuestion('👉 Enter absolute or relative path to RFC / plan file (or press Enter to skip): ');
+        const cleanPath = filePath.trim().replace(/^["']|["']$/g, '');
+        
+        if (!cleanPath) {
+          console.log('⏩ Skipping pre-existing plan ingestion.');
+          break;
+        }
+
+        const resolvedPath = path.isAbsolute(cleanPath) ? cleanPath : path.resolve(process.cwd(), cleanPath);
+        if (fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).isFile()) {
+          try {
+            const fileContent = fs.readFileSync(resolvedPath, 'utf8').trim();
+            existingContext += `\n\n==================== PRE-EXISTING PLAN / RFC (${path.basename(resolvedPath)}) ====================\n${fileContent}\n================================================================================`;
+            logSuccess(`Ingested pre-existing plan from ${resolvedPath}!`);
+            fileLoaded = true;
+          } catch (e) {
+            logWarning(`Could not read file: ${e.message}. Please try another path or press Enter to skip.`);
+          }
+        } else {
+          logWarning(`Could not find file at: "${cleanPath}". Please make sure you are providing the right relative or absolute path (or press Enter to skip).`);
+        }
+      }
+    }
+  }
+
+  // Strip flags from feature ask string
+  const cleanAsk = featureAsk
+    .replace(/--(file|plan|context)=("[^"]*"|'[^']*'|[^\s]+)/gi, '')
+    .trim() || 'Software Engineering Feature';
+
+  const fullRefinePrompt = cleanAsk + existingContext;
+
   logStep('Step 0 Prompt Refinement', provider.name, provider.model);
 
-  const refinementResult = await executeStagePrompt('refine', featureAsk);
+  const refinementResult = await executeStagePrompt('refine', fullRefinePrompt);
   const { questions, assumptions } = parseRefinementItems(refinementResult);
 
   const answeredQA = [];
+  if (existingContext) {
+    answeredQA.push(`PRE-EXISTING CONSTRAINTS & ARCHITECTURE NOTES:\n${existingContext}`);
+  }
 
   if (questions.length > 0 || assumptions.length > 0) {
     console.log('📋 Let\'s clarify a few details one-by-one before drafting requirements:\n');
