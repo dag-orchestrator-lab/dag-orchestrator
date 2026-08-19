@@ -1186,9 +1186,54 @@ async function main() {
             }
           }
         } else if (subCmd === 'set' && key && val) {
+          const oldSpecsDir = config.SPECS_DIR || 'docs/features';
           saveConfig({ [key]: val });
           saveLocalConfig({ [key]: val });
           logSuccess(`Set ${key}=${val}`);
+
+          // If SPECS_DIR changed, check if existing feature folders should be migrated
+          if (key === 'SPECS_DIR' && val !== oldSpecsDir) {
+            const oldBasePath = path.join(process.cwd(), oldSpecsDir);
+            const newBasePath = path.join(process.cwd(), val);
+
+            if (fs.existsSync(oldBasePath)) {
+              const featuresToMove = fs.readdirSync(oldBasePath)
+                .filter(f => fs.statSync(path.join(oldBasePath, f)).isDirectory());
+
+              if (featuresToMove.length > 0) {
+                console.log(`\n📦 Found ${featuresToMove.length} feature workspace(s) in "${oldSpecsDir}":`);
+                for (const feat of featuresToMove) {
+                  console.log(`   • ${feat}`);
+                }
+                const moveAns = await askQuestion(`\n👉 Move these feature workspaces to the new location ("${val}")? [Y/n] (Default: Y): `);
+                const trimmed = moveAns.trim().toLowerCase();
+                if (!trimmed || trimmed === 'y' || trimmed === 'yes') {
+                  if (!fs.existsSync(newBasePath)) {
+                    fs.mkdirSync(newBasePath, { recursive: true });
+                  }
+                  for (const feat of featuresToMove) {
+                    const srcPath = path.join(oldBasePath, feat);
+                    const destPath = path.join(newBasePath, feat);
+                    fs.renameSync(srcPath, destPath);
+                  }
+                  logSuccess(`Successfully migrated ${featuresToMove.length} feature workspace(s) to "${val}"!`);
+
+                  // Add to .gitignore if moving to .dag/
+                  if (val.startsWith('.dag')) {
+                    const gitignorePath = path.join(process.cwd(), '.gitignore');
+                    if (fs.existsSync(gitignorePath)) {
+                      let gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
+                      if (!gitignoreContent.includes('.dag/')) {
+                        gitignoreContent += '\n# DAG Orchestrator workspace and local backups\n.dag/\n';
+                        fs.writeFileSync(gitignorePath, gitignoreContent);
+                        logSuccess('Added .dag/ to .gitignore');
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
         } else if (subCmd === 'get' && key) {
           console.log(`${key}=${config[key] || 'not set'}`);
         } else {
