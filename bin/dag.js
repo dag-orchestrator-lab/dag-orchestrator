@@ -76,9 +76,8 @@ async function ensureRepoInit(cwd = process.cwd()) {
   console.log(`\n👉 Where should DAG store feature specification documents?`);
   console.log(`   ${ANSI.bold}[1] Committed with codebase${ANSI.reset} → ${ANSI.cyan}docs/features/<feature-name>/${ANSI.reset} (Default)`);
   console.log(`   ${ANSI.bold}[2] Gitignored private workspace${ANSI.reset} → ${ANSI.cyan}.dag/features/<feature-name>/${ANSI.reset}`);
-  console.log(`   ${ANSI.bold}[3] Project root directly${ANSI.reset} → ${ANSI.cyan}./ (00-requirements.md, etc.)${ANSI.reset}`);
 
-  const choice = await askQuestion('\nSelection [1/2/3] (Default: 1): ');
+  const choice = await askQuestion('\nSelection [1/2] (Default: 1): ');
   const trimmed = choice.trim();
 
   let specsDir = 'docs/features';
@@ -87,9 +86,6 @@ async function ensureRepoInit(cwd = process.cwd()) {
   if (trimmed === '2') {
     specsDir = '.dag/features';
     shouldGitignore = true;
-  } else if (trimmed === '3') {
-    specsDir = '.';
-    shouldGitignore = false;
   } else {
     specsDir = 'docs/features';
     shouldGitignore = false;

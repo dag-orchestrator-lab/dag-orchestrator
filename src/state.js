@@ -34,31 +34,26 @@ export function getFeatureWorkspaceDir(cwd = process.cwd()) {
     return dir;
   }
 
-  // 2. Check if local root already has 00-requirements or 02-contracts
-  if (fs.existsSync(path.join(cwd, '00-requirements.md')) || fs.existsSync(path.join(cwd, '02-contracts.md'))) {
-    return cwd;
-  }
+  // 2. Check docs/features/ or .dag/features/
+  const baseSpecsDir = config.SPECS_DIR || 'docs/features';
+  const targetBase = path.join(cwd, baseSpecsDir);
 
-  // 3. Check docs/features/ or .dag/features/
-  const candidateBases = [
-    config.SPECS_DIR ? path.join(cwd, config.SPECS_DIR) : null,
-    path.join(cwd, 'docs', 'features'),
-    path.join(cwd, '.dag', 'features')
-  ].filter(Boolean);
-
-  for (const base of candidateBases) {
-    if (fs.existsSync(base)) {
-      const subdirs = fs.readdirSync(base)
-        .filter(f => fs.statSync(path.join(base, f)).isDirectory())
-        .sort()
-        .reverse();
-      if (subdirs.length > 0) {
-        return path.join(base, subdirs[0]);
-      }
+  if (fs.existsSync(targetBase)) {
+    const subdirs = fs.readdirSync(targetBase)
+      .filter(f => fs.statSync(path.join(targetBase, f)).isDirectory())
+      .sort()
+      .reverse();
+    if (subdirs.length > 0) {
+      return path.join(targetBase, subdirs[0]);
     }
   }
 
-  return cwd;
+  // 3. Auto-create date-stamped feature dir in target base
+  const defaultDir = path.join(targetBase, 'current-feature');
+  if (!fs.existsSync(defaultDir)) {
+    fs.mkdirSync(defaultDir, { recursive: true });
+  }
+  return defaultDir;
 }
 
 export function resolveArtifactPath(filename, cwd = process.cwd()) {
