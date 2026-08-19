@@ -302,11 +302,63 @@ async function runStep0(featureAsk, options = {}) {
 
     if (questions.length > 0) {
       console.log('--- QUESTIONS NEEDING YOUR INPUT ---');
+      const deferredQuestions = [];
+
+      const resolveQuestion = async (qText, qIdx, totalCount, isDeferred = false) => {
+        const prefix = isDeferred ? `⏳ [Deferred Question ${qIdx}/${totalCount}]` : `❓ [Question ${qIdx}/${totalCount}]`;
+        console.log(`\n${prefix}`);
+        console.log(qText);
+
+        while (true) {
+          const hint = isDeferred 
+            ? '👉 Your answer (or type "?" / "recommend" for options): '
+            : '👉 Your answer (or type "?" for recommendation, "skip" to defer): ';
+          const ans = await askQuestion(`\n${hint}`);
+          const trimmed = ans.trim();
+
+          // 1. Check if user wants to defer
+          if (!isDeferred && (trimmed.toLowerCase() === 'skip' || trimmed.toLowerCase() === 'defer')) {
+            console.log(`⏳ Postponed. We will resolve this before generating requirements.\n`);
+            deferredQuestions.push(qText);
+            return;
+          }
+
+          // 2. Check if user wants on-demand recommendation / consultation
+          if (trimmed === '?' || trimmed.toLowerCase().includes('recommend') || trimmed.endsWith('?') || /what do you/i.test(trimmed)) {
+            logStep('Consulting Staff Architect Engine...', provider.name, provider.model);
+            const recommendation = await executeStagePrompt('refine', 
+              `The user is asking for architectural advice on this question: "${qText}".\nUser Inquiry: "${trimmed}".\nGive a concise 2-bullet trade-off comparison (Option A vs Option B) with a clear recommendation.`
+            );
+            console.log(`\n💡 ${ANSI.cyan}${ANSI.bold}Staff Architect Recommendation:${ANSI.reset}`);
+            console.log(recommendation);
+            console.log('');
+            continue; // Prompt for final answer after giving recommendation
+          }
+
+          // 3. User provided concrete answer
+          const finalAns = trimmed || 'No specific preference provided';
+          answeredQA.push(`Q: ${qText}\nA: ${finalAns}`);
+          logSuccess(`Saved decision: "${finalAns}"`);
+          return;
+        }
+      };
+
+      // First pass through questions
       for (let i = 0; i < questions.length; i++) {
-        console.log(`\n❓ [Question ${i + 1}/${questions.length}]`);
-        console.log(questions[i]);
-        const ans = await askQuestion('\n👉 Your answer: ');
-        answeredQA.push(`Q: ${questions[i]}\nA: ${ans || 'No specific preference provided'}`);
+        await resolveQuestion(questions[i], i + 1, questions.length, false);
+      }
+
+      // Replay deferred questions queue
+      if (deferredQuestions.length > 0) {
+        console.log(`\n${ANSI.yellow}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+        console.log(`│ ⏳ RESOLVING DEFERRED QUESTIONS (${deferredQuestions.length} remaining)                      │`);
+        console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
+        console.log(`│ An explicit decision is required before drafting 00-requirements.md│`);
+        console.log(`${ANSI.yellow}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}`);
+
+        for (let j = 0; j < deferredQuestions.length; j++) {
+          await resolveQuestion(deferredQuestions[j], j + 1, deferredQuestions.length, true);
+        }
       }
     }
 
