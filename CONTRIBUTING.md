@@ -18,8 +18,8 @@ By contributing, you certify that:
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/your-org/dag-harness.git
-   cd dag-harness
+   git clone https://github.com/dag-orchestrator-lab/dag-orchestrator.git
+   cd dag-orchestrator
    ```
 
 2. **Link globally for local testing:**
