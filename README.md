@@ -132,6 +132,34 @@ Add a `.dagrules` file in your repository root to enforce team-specific standard
 
 ---
 
+## 🗺️ Planned Improvements & Architecture Milestones
+
+The DAG Orchestrator roadmap is designed around increasing IDE integration, multi-package monorepo intelligence, and enterprise-grade CI/CD automation:
+
+### 🟢 `v0.1.0-alpha` (Current Release — Incubation & Dogfooding)
+- [x] Deterministic 5-stage contract-first state machine.
+- [x] Asymmetric multi-model routing & benchmark cost engine (`dag stats`).
+- [x] Pre-Flight Gate Verifier & adaptive `.dagrules` policy learning loop.
+- [x] JIT Cross-Service schema harvester (`dag service`) with Postman/Thunder Client support.
+- [x] Multi-feature isolated workspaces & branch stacking (`dag stack`).
+
+### 🟡 `v0.2.0-beta` (IDE Integration & Strict Type Safety)
+- [ ] **TypeScript Porting:** Migrate codebase to 100% strict TypeScript with bundled type definitions (`.d.ts`).
+- [ ] **VS Code & Cursor Extension:** Visual sidebar showing real-time DAG state, gate approval buttons, and diff inspector directly in the editor.
+- [ ] **Antigravity IDE Plugin & Custom Agent Tooling:** First-class slash command and sidecar agent support for Google Antigravity.
+- [ ] **Interactive Terminal UI (TUI):** Rich interactive dashboards powered by Ink/React CLI.
+
+### 🟣 `v0.3.0` (Monorepos & Enterprise Multi-Package Routing)
+- [ ] **Monorepo & Workspace Routing:** Native Turborepo, Nx, and Cargo workspace dependency graph traversal.
+- [ ] **Semantic Diff & Breaking Change Analyzer:** AST-based schema comparison flagging breaking database/API modifications before PR opening.
+- [ ] **Custom Provider Plugin SDK:** Standardized interface for registering proprietary on-prem models and custom vector stores.
+
+### 🔵 `v1.0.0` (Enterprise GA & CI/CD Gatekeeper)
+- [ ] **Headless CI/CD GitHub Action:** Enforce contract compliance and run pre-flight gate verifiers on incoming Pull Requests automatically.
+- [ ] **Team Policy Cloud Sync:** Centralized synchronization of enterprise `.dagrules` across distributed engineering teams.
+
+---
+
 ## 📄 License
 
 Distributed under the **MIT License**. See [`LICENSE`](LICENSE) for more information.
