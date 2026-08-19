@@ -236,18 +236,29 @@ async function runStep0(featureAsk, options = {}) {
         logSuccess('Loaded architectural notes!');
       }
     } else if (cleanChoice === '2') {
-      const filePath = await askQuestion('👉 Enter path to RFC / plan file: ');
-      const cleanPath = filePath.trim();
-      if (cleanPath && fs.existsSync(cleanPath)) {
-        try {
-          const fileContent = fs.readFileSync(cleanPath, 'utf8').trim();
-          existingContext += `\n\n==================== PRE-EXISTING PLAN / RFC (${path.basename(cleanPath)}) ====================\n${fileContent}\n================================================================================`;
-          logSuccess(`Ingested pre-existing plan from ${cleanPath}!`);
-        } catch (e) {
-          logWarning(`Could not read plan file: ${e.message}`);
+      let fileLoaded = false;
+      while (!fileLoaded) {
+        const filePath = await askQuestion('👉 Enter absolute or relative path to RFC / plan file (or press Enter to skip): ');
+        const cleanPath = filePath.trim().replace(/^["']|["']$/g, '');
+        
+        if (!cleanPath) {
+          console.log('⏩ Skipping pre-existing plan ingestion.');
+          break;
         }
-      } else if (cleanPath) {
-        logWarning(`File not found: ${cleanPath}. Proceeding with standard refinement.`);
+
+        const resolvedPath = path.isAbsolute(cleanPath) ? cleanPath : path.resolve(process.cwd(), cleanPath);
+        if (fs.existsSync(resolvedPath) && fs.statSync(resolvedPath).isFile()) {
+          try {
+            const fileContent = fs.readFileSync(resolvedPath, 'utf8').trim();
+            existingContext += `\n\n==================== PRE-EXISTING PLAN / RFC (${path.basename(resolvedPath)}) ====================\n${fileContent}\n================================================================================`;
+            logSuccess(`Ingested pre-existing plan from ${resolvedPath}!`);
+            fileLoaded = true;
+          } catch (e) {
+            logWarning(`Could not read file: ${e.message}. Please try another path or press Enter to skip.`);
+          }
+        } else {
+          logWarning(`Could not find file at: "${cleanPath}". Please make sure you are providing the right relative or absolute path (or press Enter to skip).`);
+        }
       }
     }
   }
