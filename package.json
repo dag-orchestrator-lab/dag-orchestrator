@@ -1,0 +1,14 @@
+{
+  "name": "dag-orchestrator",
+  "version": "0.1.0-alpha",
+  "description": "Deterministic Multi-Agent DAG Orchestrator with Adversarial Falsification",
+  "type": "module",
+  "main": "bin/dag.js",
+  "bin": {
+    "dag": "bin/dag.js"
+  },
+  "scripts": {
+    "dag": "node bin/dag.js",
+    "dsh": "npx @deepseek-ai/dsh web"
+  }
+}

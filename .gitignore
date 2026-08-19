@@ -1,0 +1,11 @@
+node_modules/
+.env
+*.env
+.dag/
+.dag-backup/
+.chrome-temp/
+*.tgz
+*.zip
+*.pdf
+*.log
+.DS_Store

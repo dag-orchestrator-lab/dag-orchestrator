@@ -1,0 +1,139 @@
+import { execSync, spawn } from 'node:child_process';
+
+/**
+ * Execute Claude Code CLI with a given prompt
+ */
+export async function runClaudePrompt(prompt, cwd = process.cwd()) {
+  return new Promise((resolve, reject) => {
+    // Escaping prompt safely for shell execution
+    const child = spawn('claude', ['-p', prompt], {
+      cwd,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env }
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', data => {
+      stdout += data.toString();
+    });
+
+    child.stderr.on('data', data => {
+      stderr += data.toString();
+    });
+
+    child.on('close', code => {
+      if (code !== 0 && !stdout) {
+        return reject(new Error(`Claude Code failed (exit ${code}): ${stderr}`));
+      }
+      resolve(stdout.trim());
+    });
+
+    child.on('error', err => {
+      reject(new Error(`Failed to invoke claude CLI: ${err.message}. Is claude installed globally and in PATH?`));
+    });
+  });
+}
+
+/**
+ * Step 1: Draft Technical Interface Contract Spec
+ */
+export async function claudeDraftContract(requirementsText, reconText, contractTemplateText, cwd, feedback = '') {
+  let prompt = `You are writing 02-contracts.md for a new feature.
+Use the following inputs:
+- 00-requirements.md:
+${requirementsText}
+
+- 01-recon.md:
+${reconText}
+
+- Template Reference:
+${contractTemplateText}`;
+
+  if (feedback) {
+    prompt += `\n\n- USER FEEDBACK & REVISION INSTRUCTIONS:\n${feedback}`;
+  }
+
+  prompt += `\n\nRules:
+1. Fill every section. Where a section does not apply, write "None" and one line of justification — never delete the section.
+2. Where the recon report found no precedent, say so explicitly at the relevant point.
+3. Write plain sentences a non-engineer stakeholder could follow for every _Plain:_ prompt, then the exact technical spec below it.
+4. IMPORTANT: Do NOT use tools or ask for permissions to write files. Output the raw text of the complete 02-contracts.md markdown document directly in your response.`;
+
+  return await runClaudePrompt(prompt, cwd);
+}
+
+/**
+ * Step 2: Merge Layer Plans into Dependency-Ordered Task List
+ */
+export async function claudePlanMerger(contractText, layerPlans, findingsText, cwd) {
+  const prompt = `You are plan-merger. You merge plans. You do not design.
+
+Inputs:
+02-contracts.md:
+${contractText}
+
+Domain Plan (03-domain.md):
+${layerPlans.domain || 'None'}
+
+App-Infra Plan (03-app-infra.md):
+${layerPlans.appInfra || 'None'}
+
+Data Plan (03-data.md):
+${layerPlans.data || 'None'}
+
+Skeptic Findings (04-findings.md):
+${findingsText || 'None'}
+
+Rules:
+1. 02-contracts.md is immutable. Where a layer plan contradicts the contract, record it under ## Conflicts at the top of 05-tasks.md and continue.
+2. Produce a task list ordered by dependency (Schema expand -> Stored procs -> Domain types -> Ports -> Adapters -> Handlers -> Wiring -> Schema contract).
+3. Every task carries:
+   ### T-<n> <imperative title>
+   Depends on: T-<n>
+   Lane: keep | change | shared
+   Files: <paths>
+   Done when: <assertion>
+   Check: <command>
+4. Fold BLOCKER and MAJOR findings from 04-findings.md into the task it affects as an inline constraint.
+5. IMPORTANT: Do NOT use tools or ask for permissions to write files. Output the raw text of the complete 05-tasks.md markdown document directly in your response.`;
+
+  return await runClaudePrompt(prompt, cwd);
+}
+
+/**
+ * Step 3: Implement Next Atomic Task
+ */
+export async function claudeImplementTask(taskText, contractText, cwd) {
+  const prompt = `Implement this task from 05-tasks.md:
+${taskText}
+
+Reference Contract (02-contracts.md):
+${contractText}
+
+Rules:
+1. Check the task Lane (keep: characterize current; change: test new spec; shared: test package contract + smoke).
+2. Write tests first, confirm test fails (or passes for keep), implement code touching ONLY the listed files.
+3. Run the task check command, typecheck, and linter.`;
+
+  return await runClaudePrompt(prompt, cwd);
+}
+
+/**
+ * Step 4: Final Code Review before commit
+ */
+export async function claudeCodeReview(diffText, reviewRulesText, cwd) {
+  const prompt = `You are performing a final code review scoped strictly to correctness, reuse, and simplification.
+
+Review Guidelines:
+${reviewRulesText}
+
+Git Diff:
+${diffText}
+
+Verify that the code is clean, idiomatic, follows codebase conventions, and is ready to commit.
+IMPORTANT: Do NOT use tools or ask for permissions. Output the markdown review directly.`;
+
+  return await runClaudePrompt(prompt, cwd);
+}
