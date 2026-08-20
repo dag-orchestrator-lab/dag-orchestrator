@@ -222,9 +222,12 @@ workflow:
             }
             logSuccess(`Saved ${toSave.length} permanent policy rules to .dagrules!\n`);
           }
+        } else {
+          console.log('\n💡 Codebase scanned: No explicit unique conventions found to extract.');
+          console.log('   You can add team-specific rules anytime in `.dagrules` or run `dag rules harvest`.\n');
         }
       } catch (err) {
-        logWarning(`Could not auto-harvest rules: ${err.message}`);
+        logWarning(`Could not auto-harvest rules: ${err.message}\n`);
       }
     }
   }
