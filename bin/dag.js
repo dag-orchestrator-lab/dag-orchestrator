@@ -26,7 +26,7 @@ import {
   slugify 
 } from '../src/state.js';
 import { recordStageMetrics, getFeatureBenchmark } from '../src/metrics.js';
-import { loadProjectRules, formatRulesForPrompt, appendLearnedRule, extractConventionsFromRecon } from '../src/rules.js';
+import { loadProjectRules, formatRulesForPrompt, appendLearnedRule, extractConventionsFromRecon, RULE_PRESETS, applyRulePreset } from '../src/rules.js';
 import { verifyContractSpec, verifyTaskList, renderVerificationReport, verifyFullPipeline } from '../src/verifier.js';
 import { linkService, unlinkService, harvestAllLinkedServices, renderServicesList } from '../src/services.js';
 import { isFrontendTask, processUIDesignReference, formatUIContractSection } from '../src/ui-design.js';
@@ -224,7 +224,22 @@ workflow:
           }
         } else {
           console.log('\n💡 Codebase scanned: No explicit unique conventions found to extract.');
-          console.log('   You can add team-specific rules anytime in `.dagrules` or run `dag rules harvest`.\n');
+          console.log('👉 Would you like to seed `.dagrules` with an industry standard preset?');
+          console.log(`   ${ANSI.bold}[1] TypeScript & Node.js Enterprise${ANSI.reset} (Strict types, Result<T,E>, TDD)`);
+          console.log(`   ${ANSI.bold}[2] Microservices & Distributed${ANSI.reset}     (Idempotency, Outbox, OpenTelemetry)`);
+          console.log(`   ${ANSI.bold}[3] Modern Frontend / Fullstack${ANSI.reset}     (React/Next.js, 5-state matrix, A11y)`);
+          console.log(`   ${ANSI.bold}[4] Python & FastAPI Backend${ANSI.reset}        (Pydantic v2, async DB, Mypy)`);
+          console.log(`   ${ANSI.bold}[5] ⏩ Skip (Start with empty rules)${ANSI.reset}\n`);
+
+          const presetChoice = await askQuestion('Selection [1/2/3/4/5] (Default: 1): ');
+          const pTrim = presetChoice.trim() || '1';
+          const presetMap = { '1': 'typescript', '2': 'microservices', '3': 'frontend', '4': 'python' };
+          if (presetMap[pTrim]) {
+            const res = applyRulePreset(presetMap[pTrim], cwd);
+            logSuccess(`Seeded .dagrules with "${res.preset}" (${res.count} rules)!\n`);
+          } else {
+            console.log('⏩ Skipped rule preset seeding.\n');
+          }
         }
       } catch (err) {
         logWarning(`Could not auto-harvest rules: ${err.message}\n`);
@@ -1054,6 +1069,27 @@ async function main() {
               logSuccess(`Saved ${toSave.length} permanent policy rules to .dagrules!`);
             }
           }
+        } else if (rulesSubCmd === 'preset' || rulesSubCmd === 'template') {
+          const targetPreset = args[1];
+          if (!targetPreset) {
+            console.log(`\n${ANSI.cyan}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+            console.log(`│ 📜 CURATED .DAGRULES PRESETS                                       │`);
+            console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
+            for (const [pKey, pVal] of Object.entries(RULE_PRESETS)) {
+              console.log(`  ${ANSI.bold}${pKey.padEnd(16)}${ANSI.reset} → ${pVal.name}`);
+              console.log(`    ${ANSI.dim}${pVal.desc}${ANSI.reset}`);
+            }
+            console.log(`${ANSI.cyan}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}\n`);
+            console.log(`Usage:`);
+            console.log(`  dag rules preset <name>          Apply a preset (typescript | microservices | frontend | python)\n`);
+          } else {
+            try {
+              const res = applyRulePreset(targetPreset.toLowerCase());
+              logSuccess(`Applied "${res.preset}" preset to .dagrules! (${res.count} rules added)\n`);
+            } catch (err) {
+              logError(err.message);
+            }
+          }
         } else {
           console.log(`\n${ANSI.cyan}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
           console.log(`│ 📜 ACTIVE TEAM & ARCHITECTURE RULES (.dagrules)                    │`);
@@ -1061,11 +1097,13 @@ async function main() {
           if (projectRules.rules) {
             console.log(projectRules.rules);
           } else {
-            console.log(`│ No .dagrules file found. Run \`dag rules harvest\` to generate one!  │`);
+            console.log(`│ No .dagrules file found.                                           │`);
+            console.log(`│ Run \`dag rules preset\` or \`dag rules harvest\` to generate one!      │`);
           }
           console.log(`${ANSI.cyan}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}`);
           console.log(`Usage:`);
-          console.log(`  dag rules harvest                Scan whole codebase & auto-generate .dagrules\n`);
+          console.log(`  dag rules harvest                Scan whole codebase & auto-generate .dagrules`);
+          console.log(`  dag rules preset <name>          Apply standard rule preset (typescript | microservices | frontend | python)\n`);
         }
         break;
 

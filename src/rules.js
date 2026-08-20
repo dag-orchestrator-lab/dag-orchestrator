@@ -4,6 +4,61 @@ import os from 'node:os';
 
 const MAX_RULES_BYTES = 4096; // 4KB guard against prompt bloat
 
+export const RULE_PRESETS = {
+  'typescript': {
+    name: 'TypeScript & Node.js Enterprise',
+    desc: 'Strict types, no implicit any, ESM loaders, Result<T,E> errors, Vitest/Jest TDD',
+    content: `# TypeScript & Node.js Engineering Rules
+- [Architecture] Strictly enforce layered architecture: Controller/Handler -> Domain Service -> Repository Port -> DB Adapter.
+- [Type Safety] Explicit \`any\` is strictly prohibited. Use strong interfaces, generics, or \`unknown\` with type guards.
+- [Error Handling] Handlers must return structured RFC 7807 error envelopes or custom Result<T, Error> types.
+- [Testing] Write unit tests first (TDD). Every business rule must have a characterization test before modifying code.
+- [DB Safety] Database changes must be non-destructive (expand-and-contract migrations only).
+`
+  },
+  'microservices': {
+    name: 'Microservices & Distributed Systems',
+    desc: 'Idempotency keys, distributed transaction safety, outbox pattern, async event schemas',
+    content: `# Microservices & Distributed Architecture Rules
+- [API Contracts] All inter-service calls must use strict schema validation (OpenAPI/Protobuf/JSON Schema).
+- [Resilience] Every mutable RPC/HTTP endpoint must accept an Idempotency-Key header.
+- [Data Consistency] Cross-service state updates must use the Outbox pattern or Saga orchestration; no distributed 2PC locks.
+- [Observability] Propagate OpenTelemetry trace_id and span_id across all asynchronous messages and RPC calls.
+- [Deploy Safety] Code changes must be backward-compatible with at least N-1 version of sibling services.
+`
+  },
+  'frontend': {
+    name: 'Modern Web & Frontend (React / Next.js / Tailwind)',
+    desc: 'Accessible components, state matrices [Idle, Loading, Error, Empty], data-testid',
+    content: `# Modern Frontend & UI/UX Rules
+- [State Matrix] Every interactive component must explicitly handle 5 states: [Idle, Loading, Error, Empty, Disabled].
+- [Accessibility] All form inputs and buttons must include accessible aria-labels and semantic HTML roles.
+- [Testing] Every interactive element must carry an explicit \`data-testid\` attribute for automated E2E testing.
+- [Styling] Use design system tokens / Tailwind utility classes; avoid hardcoded magic pixel values.
+- [Performance] Lazy-load heavy components and prioritize Core Web Vitals (LCP, INP, CLS).
+`
+  },
+  'python': {
+    name: 'Python & FastAPI Backend',
+    desc: 'Pydantic v2 schemas, type annotations, async SQLAlchemy, Pytest fixtures',
+    content: `# Python & FastAPI Engineering Rules
+- [Type Checking] Enforce strict typing with Mypy and Pydantic v2 schemas on all request/response boundaries.
+- [Layering] Separate FastAPI route handlers from service layer business logic.
+- [Database] Use async SQLAlchemy / Alembic migrations with non-destructive column additions.
+- [Testing] Use Pytest fixtures with AAA (Arrange-Act-Assert) pattern and parameterized test cases.
+`
+  }
+};
+
+export function applyRulePreset(presetKey, cwd = process.cwd()) {
+  const preset = RULE_PRESETS[presetKey];
+  if (!preset) throw new Error(`Unknown rule preset: ${presetKey}`);
+
+  const rulePath = path.join(cwd, '.dagrules');
+  fs.writeFileSync(rulePath, preset.content.trim() + '\n');
+  return { path: rulePath, preset: preset.name, count: preset.content.split('\n- ').length - 1 };
+}
+
 export function loadProjectRules(cwd = process.cwd()) {
   const candidatePaths = [
     path.join(cwd, '.dagrules'),
