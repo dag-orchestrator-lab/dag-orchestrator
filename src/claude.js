@@ -6,7 +6,8 @@ import { execSync, spawn } from 'node:child_process';
 export async function runClaudePrompt(prompt, cwd = process.cwd()) {
   return new Promise((resolve, reject) => {
     // Escaping prompt safely for shell execution
-    const child = spawn('claude', ['-p', prompt], {
+    // Added --dangerously-skip-permissions to allow Claude Code to edit/write files autonomously in pipeline mode
+    const child = spawn('claude', ['--dangerously-skip-permissions', '-p', prompt], {
       cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...process.env }
