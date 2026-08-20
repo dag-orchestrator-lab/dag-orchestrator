@@ -58,12 +58,12 @@ function askMultiLine(promptText) {
   });
 }
 
-async function ensureRepoInit(cwd = process.cwd()) {
+async function ensureRepoInit(cwd = process.cwd(), force = false) {
   const config = loadConfig(cwd);
   const localConfigPath = path.join(cwd, '.dag', 'config.json');
 
-  // Check if project has already been initialized
-  if (fs.existsSync(localConfigPath) && config.SPECS_DIR) {
+  // Check if project has already been initialized (unless force is true)
+  if (!force && fs.existsSync(localConfigPath) && config.SPECS_DIR) {
     return config;
   }
 
@@ -897,7 +897,23 @@ async function main() {
   try {
     switch (command) {
       case 'init':
-        await ensureRepoInit();
+        const localConf = path.join(process.cwd(), '.dag', 'config.json');
+        if (fs.existsSync(localConf)) {
+          console.log(`\n${ANSI.cyan}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+          console.log(`│ ⚙️  DAG REPOSITORY ALREADY INITIALIZED                              │`);
+          console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
+          console.log(`│ Current SPECS_DIR:  ${ANSI.bold}${config.SPECS_DIR || 'docs/features'}${ANSI.reset}`);
+          console.log(`│ Current Harness:    ${ANSI.bold}${config.DEFAULT_HARNESS || 'standalone'}${ANSI.reset}`);
+          console.log(`│ Active Feature:     ${ANSI.bold}${config.ACTIVE_FEATURE || '(None active)'}${ANSI.reset}`);
+          console.log(`${ANSI.cyan}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}\n`);
+
+          const reinit = await askQuestion('👉 Re-run interactive repository setup? [y/N] (Default: N): ');
+          if (reinit.trim().toLowerCase() === 'y' || reinit.trim().toLowerCase() === 'yes') {
+            await ensureRepoInit(process.cwd(), true);
+          }
+        } else {
+          await ensureRepoInit(process.cwd(), true);
+        }
         break;
 
       case 'service':
