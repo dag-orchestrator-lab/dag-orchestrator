@@ -5,10 +5,13 @@ import http from 'node:http';
 import { ANSI } from './ui.js';
 
 export function isFrontendTask(askText = '', repoSummary = '') {
-  const feKeywords = /\b(ui|ux|frontend|front-end|component|page|view|screen|modal|dialog|button|sidebar|navbar|header|footer|css|tailwind|styled|sass|scss|html|react|vue|svelte|angular|nextjs|nuxt|astro|layout|responsive|theme|figma|form|input|select|picker|dropdown|table|card)\b/i;
+  // Comprehensive UI/UX/Visual vocabulary
+  const feKeywords = /\b(ui|ux|frontend|front-end|gui|component|page|view|screen|dashboard|report|html|css|style|styles|styled|tailwind|sass|scss|modal|dialog|drawer|popup|banner|dropdown|select|picker|table|grid|card|button|menu|navbar|header|footer|sidebar|theme|dark-mode|light-mode|responsive|layout|animation|render|template|svg|figma|visual|canvas)\b/i;
   const isKeywordMatch = feKeywords.test(askText);
-  const repoHasFrontend = /\.(tsx|jsx|vue|svelte|html|css|scss)/i.test(repoSummary);
-  return isKeywordMatch || (askText.length > 50 && repoHasFrontend);
+  const repoHasFrontend = /\.(tsx|jsx|vue|svelte|html|css|scss|ejs|hbs)/i.test(repoSummary);
+  
+  // Trigger if keywords match, or if repo has frontend files and ask touches user-facing capabilities
+  return isKeywordMatch || (askText.length > 20 && repoHasFrontend);
 }
 
 export function fetchUrlContent(targetUrl) {

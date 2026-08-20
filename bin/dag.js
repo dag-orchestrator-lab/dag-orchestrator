@@ -431,7 +431,8 @@ async function runStep0(featureAsk, options = {}) {
 
     // Frontend UI/UX Design Detection & Interactive Wizard
     const repoSummary = getRepoContextSummary();
-    if (isFrontendTask(featureAsk, repoSummary)) {
+    const fullAskContext = `${featureAsk} ${existingContext} ${answeredQA.join(' ')}`;
+    if (isFrontendTask(fullAskContext, repoSummary)) {
       console.log(`\n${ANSI.magenta}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
       console.log(`│ 🎨 FRONTEND WORK DETECTED: Let's align on the UI/UX design reference│`);
       console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
