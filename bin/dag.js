@@ -91,6 +91,34 @@ async function ensureRepoInit(cwd = process.cwd(), force = false) {
     shouldGitignore = false;
   }
 
+  // Step 2: Choose Execution Harness
+  console.log(`\n👉 Select Execution Harness runner:`);
+  console.log(`   ${ANSI.bold}[1] standalone${ANSI.reset} → Lightweight CLI mode with native ANSI status cards (Default)`);
+  console.log(`   ${ANSI.bold}[2] dsh${ANSI.reset}        → Orchestrate via DeepSeek Harness (Process supervisor & Web UI)`);
+  console.log(`   ${ANSI.bold}[3] headless${ANSI.reset}   → Zero-prompt JSON runner for CI/CD pipelines`);
+
+  const harnessChoice = await askQuestion('\nSelection [1/2/3] (Default: 1): ');
+  const hTrimmed = harnessChoice.trim();
+  let chosenHarness = 'standalone';
+  if (hTrimmed === '2') chosenHarness = 'dsh';
+  else if (hTrimmed === '3') chosenHarness = 'headless';
+
+  // Step 3: Choose Model Provider Preset
+  console.log(`\n👉 Select AI Model Stack Preset:`);
+  console.log(`   ${ANSI.bold}[1] hybrid${ANSI.reset}   → Gemini 1M+ Context & Audits + Claude Sonnet Coding (Recommended)`);
+  console.log(`   ${ANSI.bold}[2] claude${ANSI.reset}   → 100% Claude Code CLI (No external API keys required)`);
+  console.log(`   ${ANSI.bold}[3] gemini${ANSI.reset}   → 100% Google AI Studio`);
+  console.log(`   ${ANSI.bold}[4] deepseek${ANSI.reset} → 100% DeepSeek-V3 / R1`);
+  console.log(`   ${ANSI.bold}[5] local${ANSI.reset}    → 100% Offline / Air-Gapped via Ollama`);
+
+  const presetChoice = await askQuestion('\nSelection [1/2/3/4/5] (Default: 1): ');
+  const pTrimmed = presetChoice.trim();
+  let chosenPreset = 'hybrid';
+  if (pTrimmed === '2') chosenPreset = 'claude';
+  else if (pTrimmed === '3') chosenPreset = 'gemini';
+  else if (pTrimmed === '4') chosenPreset = 'deepseek';
+  else if (pTrimmed === '5') chosenPreset = 'local';
+
   // Ask about .gitignore
   if (shouldGitignore || specsDir === '.dag/features') {
     const gitignorePath = path.join(cwd, '.gitignore');
@@ -150,8 +178,16 @@ workflow:
     logSuccess('Created default dsh.config.yaml (DeepSeek Harness)');
   }
 
-  saveLocalConfig({ SPECS_DIR: specsDir }, cwd);
-  logSuccess(`Saved repository configuration! Feature specs will live in: ${specsDir}\n`);
+  saveLocalConfig({
+    SPECS_DIR: specsDir,
+    DEFAULT_HARNESS: chosenHarness,
+    DEFAULT_PROVIDER_PRESET: chosenPreset
+  }, cwd);
+
+  logSuccess(`Saved repository configuration!`);
+  console.log(`   • Specs Directory: ${ANSI.bold}${specsDir}${ANSI.reset}`);
+  console.log(`   • Harness Runner:  ${ANSI.bold}${chosenHarness}${ANSI.reset}`);
+  console.log(`   • Model Preset:    ${ANSI.bold}${chosenPreset}${ANSI.reset}\n`);
   return loadConfig(cwd);
 }
 
