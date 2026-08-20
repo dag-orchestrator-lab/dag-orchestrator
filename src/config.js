@@ -32,7 +32,11 @@ export const DEFAULT_CONFIG = {
   OPENAI_MODEL: 'deepseek-chat',
   OPENAI_BASE_URL: 'https://api.deepseek.com/v1',
   OLLAMA_MODEL: 'qwen2.5-coder:latest',
-  OLLAMA_BASE_URL: 'http://localhost:11434/v1'
+  OLLAMA_BASE_URL: 'http://localhost:11434/v1',
+
+  // Anti-Slop & Static Guardrails (Default: ON)
+  ENABLE_ANTI_SLOP: 'true', // 'true' | 'false'
+  ANTI_SLOP_COMMAND: 'npx -y oxlint@latest --deny-warnings'
 };
 
 export function loadConfig(cwd = process.cwd()) {

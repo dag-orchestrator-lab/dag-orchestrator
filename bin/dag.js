@@ -866,14 +866,36 @@ async function runStep3() {
     logStep(`Running Verification Check: "${checkCommand}"`, 'Test Runner', 'Local Shell');
 
     let isPassing = false;
+    const config = loadConfig(process.cwd());
+    const antiSlopEnabled = String(config.ENABLE_ANTI_SLOP).toLowerCase() !== 'false';
+    const antiSlopCmd = config.ANTI_SLOP_COMMAND || 'npx -y oxlint@latest --deny-warnings';
+
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
+        // 1. Run Task Verification Check
         const testOutput = execSync(checkCommand, {
           cwd: process.cwd(),
           encoding: 'utf8',
           timeout: 30000 // 30s timeout guard against infinite hangs
         });
-        logSuccess(`Check Passed on attempt ${attempt}!`);
+
+        // 2. Run Anti-Slop AST Guardrail (Oxlint) if enabled
+        if (antiSlopEnabled) {
+          try {
+            execSync(antiSlopCmd, {
+              cwd: process.cwd(),
+              encoding: 'utf8',
+              timeout: 15000
+            });
+            logSuccess(`Check Passed & Anti-Slop Guardrail Passed on attempt ${attempt}!`);
+          } catch (slopErr) {
+            const slopOutput = (slopErr.stdout || '') + '\n' + (slopErr.stderr || '');
+            throw new Error(`Anti-Slop Guardrail (Oxlint) Violation:\n${slopOutput.slice(0, 400)}`);
+          }
+        } else {
+          logSuccess(`Check Passed on attempt ${attempt}!`);
+        }
+
         isPassing = true;
         break;
       } catch (err) {
