@@ -106,16 +106,19 @@ Rules:
  * Step 3: Implement Next Atomic Task
  */
 export async function claudeImplementTask(taskText, contractText, cwd) {
-  const prompt = `Implement this task from 05-tasks.md:
+  const prompt = `You are implementing the atomic tasks defined in 05-tasks.md:
+
+Task Specification:
 ${taskText}
 
 Reference Contract (02-contracts.md):
 ${contractText}
 
-Rules:
-1. Check the task Lane (keep: characterize current; change: test new spec; shared: test package contract + smoke).
-2. Write tests first, confirm test fails (or passes for keep), implement code touching ONLY the listed files.
-3. Run the task check command, typecheck, and linter.`;
+Instructions:
+1. You MUST use your file editing/writing tools to implement the required code changes directly in the workspace files specified in "Files:".
+2. Follow TDD: Implement the unit/verification tests first and run the verification command ("Check:").
+3. Do NOT just print the code in your response — you MUST write and save the changes to the disk.
+4. Verify that all changes compile, pass typechecking, and satisfy the check commands.`;
 
   return await runClaudePrompt(prompt, cwd);
 }
