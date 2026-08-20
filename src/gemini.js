@@ -285,26 +285,20 @@ ${reconContent}`;
  * Step 3: Plan Conformance & Drift Checker
  */
 export async function geminiPlanConformance(contractContent, tasksContent, gitDiff) {
-  const systemPrompt = `You check for drift between an approved plan and the code that claims to implement it.
-You are not a general code reviewer — typecheck, lint, and tests already cover what they cover.
+  const systemPrompt = `You check for drift between the approved plan and the code currently modified in the diff.
+You are evaluating the PROGRESS of atomic task implementation.
 
-Report in exactly three sections:
+CRITICAL RULES:
+1. Scope your audit ONLY to tasks that are marked [x] / completed in 05-tasks.md, or files present in the GIT DIFF.
+2. DO NOT flag upcoming, pending, or unstarted tasks as "drift" or "unsatisfied". They are expected to be pending until their turn in the pipeline.
+3. Only report ACTUAL drift:
+   - Contract Drift: If modified code contradicts the technical contract interface.
+   - Plan Drift: If a task marked [x] is missing from the diff, or if the diff contains completely unrelated modified files.
+   - Operational Checklist: Security, SQL safety, transaction boundaries in the modified lines.
 
-**Contract drift.** Every place the code's actual interface differs from 02-contracts.md: type signatures, event names, payload shapes, envelope codes, table and procedure names, port definitions. Quote the contract, then the code.
+If the current diff satisfies the implemented tasks with zero violations, simply respond: "✅ All active tasks in diff conform strictly to contracts. No drift detected."`;
 
-**Plan drift.** Tasks marked done whose stated Done when is not actually satisfied by the diff. Also: changes in the diff that no task called for.
-
-**Operational checklist.** Only these, each pass or fail with a file reference:
-- Secrets, tokens, or PII reachable by a log statement
-- Retry paths without an idempotency guard
-- Database writes outside an explicit transaction boundary
-- Schema changes that are not backward compatible with currently deployed code
-- Unbounded queries, or N+1 patterns inside a loop
-- Errors swallowed without being logged or rethrown
-
-Say "no drift" when there is none. Do not pad.`;
-
-  const userPrompt = `02-contracts.md:\n${contractContent}\n\n05-tasks.md:\n${tasksContent}\n\nGIT DIFF:\n${gitDiff}`;
+  const userPrompt = `02-contracts.md:\n${contractContent}\n\n05-tasks.md:\n${tasksContent}\n\nCURRENT GIT DIFF:\n${gitDiff}`;
   return await callGemini(FLASH_MODEL, systemPrompt, userPrompt);
 }
 
