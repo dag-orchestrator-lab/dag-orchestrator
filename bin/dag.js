@@ -990,6 +990,17 @@ Format your output cleanly.`;
   console.log('\n--- PLAN CONFORMANCE REPORT ---');
   console.log(conformanceReport);
   console.log('-------------------------------\n');
+
+  // Provide explicit, affirmative actionable guidance
+  const isAllConforming = !/drift detected|fail/i.test(conformanceReport) || /all active tasks in diff conform/i.test(conformanceReport);
+  if (isAllConforming) {
+    console.log(`${ANSI.brightGreen}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+    console.log(`│ 🚀 SAFE TO PROCEED: Active task implementation verified & aligned!  │`);
+    console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
+    console.log(`  • Run ${ANSI.bold}dag next${ANSI.reset} (or ${ANSI.bold}dag implement${ANSI.reset}) to implement the next unblocked task.`);
+    console.log(`  • Run ${ANSI.bold}dag status${ANSI.reset} to inspect overall pipeline & artifact checklist.`);
+    console.log(`${ANSI.brightGreen}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}\n`);
+  }
 }
 
 async function runStep4() {
