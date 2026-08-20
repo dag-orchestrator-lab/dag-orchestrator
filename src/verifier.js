@@ -85,8 +85,8 @@ export function verifyContractSpec(contractText, findingsText = '', rulesText = 
 export function verifyTaskList(tasksText, contractText = '') {
   const checks = [];
 
-  // Check 1: Atomic task breakdown
-  const taskMatches = tasksText.match(/###\s+T-\d+|\- \[[ x]\]\s+Task \d+/gi) || [];
+  // Check 1: Atomic task breakdown (supports ### T-1, ### Task 1, - [ ] Task 1, ## T-1, etc.)
+  const taskMatches = tasksText.match(/###?\s+(T-\d+|Task\s+\d+)|\- \[[ x]\]\s+(Task|T-)\s*\d+/gi) || [];
   const hasTasks = taskMatches.length > 0;
   checks.push({
     name: 'Atomic Task Breakdown',
@@ -102,8 +102,8 @@ export function verifyTaskList(tasksText, contractText = '') {
     details: hasCheckCommands ? 'Every task carries an executable validation command' : 'Tasks lack automated `Check:` commands'
   });
 
-  // Check 3: File path scoping (Files: or File:)
-  const hasFileScopes = /(Files|File|Targets|Target):\s+[\w\.\/\-]+/i.test(tasksText) || /`src\/[\w\.\/\-]+`/i.test(tasksText);
+  // Check 3: File path scoping (Files: or File: or targets or none/inline files)
+  const hasFileScopes = /(Files|File|Targets|Target):\s+/i.test(tasksText) || /`[\w\.\/\-]+\.(ts|js|sql|json|tsx|jsx)`/i.test(tasksText);
   checks.push({
     name: 'File Modification Scoping',
     pass: hasFileScopes,
