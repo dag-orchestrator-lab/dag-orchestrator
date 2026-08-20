@@ -828,8 +828,9 @@ async function runStep3() {
 
   // Check if AI requested user decision, confirmation, clarification, or asked a question
   const isQuestionOrClarification = (
-    /\b(how (do|would|should) you want|which option|option\s*\(?[a-d]\)?|before I (proceed|start|write)|your (call|preference|decision)|want your call|should I (proceed|create|modify)|please (confirm|clarify|choose)|let me know (if|how|which)|do you want me to|would you prefer)\b/i.test(implResult) ||
-    /(\?\s*(\n|$)|👉)/.test(implResult.slice(-300)) // Trailing question mark or prompt in last 300 chars
+    /\b(how (do|would|should) you|which option|option\s*\(?[1-4a-d]\)?|before I (proceed|start|write)|your (call|preference|decision)|want your call|should I (proceed|create|modify)|please (confirm|clarify|choose)|let me know (if|how|which)|do you want me to|would you prefer|stopping here|needs a human decision)\b/i.test(implResult) ||
+    /\?\s*(\n|$)/.test(implResult) ||
+    /👉/.test(implResult)
   );
 
   if (isQuestionOrClarification) {
