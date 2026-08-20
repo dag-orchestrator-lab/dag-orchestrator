@@ -165,6 +165,15 @@ The DAG Orchestrator roadmap is designed around increasing IDE integration, mult
 - [ ] **Headless CI/CD GitHub Action:** Enforce contract compliance and run pre-flight gate verifiers on incoming Pull Requests automatically.
 - [ ] **Team Policy Cloud Sync:** Centralized synchronization of enterprise `.dagrules` across distributed engineering teams.
 
+## 🤝 Acknowledgments & Open Source Credits
+
+DAG Orchestrator stands on the shoulders of brilliant open-source engineering. Special gratitude to:
+
+* **[Oxlint & The Oxc Project](https://github.com/oxc-project/oxc):** For pioneering sub-30ms Rust-based JavaScript/TypeScript AST linting.
+* **[Dan Mulroy (`anti-slop`)](https://github.com/dmmulroy/anti-slop):** For establishing the "Anti-Slop" philosophy and opinionated static guardrails against AI type bluffing and synthetic boilerplate.
+* **[ast-grep](https://github.com/ast-grep/ast-grep) & [sloplint](https://github.com/dannote/sloplint):** For structural AST pattern matching against AI generated code artifacts.
+* **The Anthropic & Google AI Teams:** For developing the Claude Code CLI and Google Gemini 1M+ Context models that power our asymmetric stage routing.
+
 ---
 
 ## 📄 License
