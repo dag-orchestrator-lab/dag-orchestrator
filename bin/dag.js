@@ -826,6 +826,23 @@ async function runStep3() {
   });
   console.log(implResult);
 
+  // Check if Claude requested user decision / question
+  if (/\b(how do you want to handle|option\s*\(?[a-b]\)?|before I proceed|your call|want your call|should I proceed)\b/i.test(implResult)) {
+    console.log(`\n${ANSI.brightYellow}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+    console.log(`│ 💡 AI ASKING FOR ARCHITECTURAL DIRECTION / CLARIFICATION           │`);
+    console.log(`└────────────────────────────────────────────────────────────────────┘${ANSI.reset}`);
+    const userDecision = await askQuestion('👉 Provide your direction or choice (e.g. "Proceed with option b"): ');
+    if (userDecision.trim()) {
+      logStep('Applying architectural direction & implementing code...', codingProvider.name, codingProvider.model);
+      implResult = await executeStagePrompt('coding', '', '', {
+        taskText: `${tasksText}\n\nUSER ARCHITECTURAL DECISION / DIRECTION:\n${userDecision.trim()}`,
+        contractText,
+        cwd: process.cwd()
+      });
+      console.log(implResult);
+    }
+  }
+
   // Feature 2: Auto-Healing Test & Verification Loop
   const checkMatches = tasksText.match(/Check:\s*`?([^`\r\n]+)`?/i);
   if (checkMatches && checkMatches[1]) {
