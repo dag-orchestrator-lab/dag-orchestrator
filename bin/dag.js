@@ -991,14 +991,25 @@ Format your output cleanly.`;
   console.log(conformanceReport);
   console.log('-------------------------------\n');
 
-  // Provide explicit, affirmative actionable guidance
+  // Provide explicit, affirmative actionable guidance with live progress bar
   const isAllConforming = !/drift detected|fail/i.test(conformanceReport) || /all active tasks in diff conform/i.test(conformanceReport);
   if (isAllConforming) {
+    const currentStatus = getPipelineStatus(process.cwd());
+    const pct = currentStatus.totalTasks > 0 ? Math.round((currentStatus.implementedCount / currentStatus.totalTasks) * 100) : 0;
+    const barWidth = 20;
+    const filled = Math.round((pct / 100) * barWidth);
+    const progressBar = `[${'█'.repeat(filled)}${'░'.repeat(barWidth - filled)}] ${currentStatus.implementedCount}/${currentStatus.totalTasks} Tasks (${pct}%)`;
+
     console.log(`${ANSI.brightGreen}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
     console.log(`│ 🚀 SAFE TO PROCEED: Active task implementation verified & aligned!  │`);
     console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
-    console.log(`  • Run ${ANSI.bold}dag next${ANSI.reset} (or ${ANSI.bold}dag implement${ANSI.reset}) to implement the next unblocked task.`);
-    console.log(`  • Run ${ANSI.bold}dag status${ANSI.reset} to inspect overall pipeline & artifact checklist.`);
+    console.log(`  ${ANSI.bold}Progress:${ANSI.reset}  ${ANSI.brightCyan}${progressBar}${ANSI.reset}`);
+    if (currentStatus.implementedCount < currentStatus.totalTasks) {
+      console.log(`  • Run ${ANSI.bold}dag next${ANSI.reset} (or ${ANSI.bold}dag implement${ANSI.reset}) to implement Task ${currentStatus.implementedCount + 1}/${currentStatus.totalTasks}.`);
+    } else {
+      console.log(`  • All tasks completed! Run ${ANSI.bold}dag next${ANSI.reset} (or ${ANSI.bold}dag review${ANSI.reset}) for final impact review.`);
+    }
+    console.log(`  • Run ${ANSI.bold}dag status${ANSI.reset} to inspect overall pipeline artifacts.`);
     console.log(`${ANSI.brightGreen}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}\n`);
   }
 }
