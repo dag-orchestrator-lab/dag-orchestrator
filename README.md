@@ -156,7 +156,12 @@ The DAG Orchestrator roadmap is designed around increasing IDE integration, mult
 - [ ] **Antigravity IDE Plugin & Custom Agent Tooling:** First-class slash command and sidecar agent support for Google Antigravity.
 - [ ] **Interactive Terminal UI (TUI):** Rich interactive dashboards powered by Ink/React CLI.
 
-### 🟣 `v0.3.0` (Monorepos & Enterprise Multi-Package Routing)
+### 🟣 `v0.3.0` (Design Mode & Enterprise Multi-Package Routing)
+- [ ] **`dag design` (Double-Diamond Architecture Mode):** Divergent exploration engine generating 3 candidate architectural options, trade-off matrices, and formal `RFC.md` specs before entering the build pipeline.
+- [ ] **Configurable Lifecycle Orchestrator (`dag run` vs `dag code`):**
+  - `dag code <feature>`: Fast-path execution for concrete, well-defined requirements.
+  - `dag design <vision>`: Exploratory mode for fuzzy architectural decisions.
+  - `dag run <ask>`: Configurable master orchestrator (`DEFAULT_ENTRY_POINT=code|design`) bridging discovery to code.
 - [ ] **Monorepo & Workspace Routing:** Native Turborepo, Nx, and Cargo workspace dependency graph traversal.
 - [ ] **Semantic Diff & Breaking Change Analyzer:** AST-based schema comparison flagging breaking database/API modifications before PR opening.
 - [ ] **Custom Provider Plugin SDK:** Standardized interface for registering proprietary on-prem models and custom vector stores.
