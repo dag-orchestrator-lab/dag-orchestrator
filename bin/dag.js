@@ -1304,11 +1304,17 @@ async function main() {
         } else if (subCmd === 'get' && key) {
           console.log(`${key}=${config[key] || 'not set'}`);
         } else {
-          console.log('\n--- CURRENT DAG CONFIGURATION ---');
+          console.log(`\n${ANSI.cyan}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+          console.log(`│ ⚙️  CURRENT DAG CONFIGURATION                                       │`);
+          console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
           for (const [k, v] of Object.entries(config)) {
-            console.log(`${k} = ${v}`);
+            let displayVal = v;
+            if (/key|secret|token|password/i.test(k) && v) {
+              displayVal = v.length > 8 ? `${v.slice(0, 4)}••••••••${v.slice(-4)}` : '••••••••';
+            }
+            console.log(`  ${ANSI.bold}${k.padEnd(26)}${ANSI.reset} = ${displayVal || ANSI.dim + '(not set)' + ANSI.reset}`);
           }
-          console.log('--------------------------------\n');
+          console.log(`${ANSI.cyan}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}\n`);
         }
         break;
 
