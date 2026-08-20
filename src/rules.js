@@ -86,3 +86,19 @@ export function appendLearnedRule(feedbackText, category = 'General', cwd = proc
   fs.writeFileSync(rulePath, updatedContent);
   return { updated: true, rule: formattedBullet, path: rulePath };
 }
+
+/**
+ * Parses discovered architectural conventions from 01-recon.md (Section 4)
+ */
+export function extractConventionsFromRecon(reconText = '') {
+  if (!reconText) return [];
+  const conventionsMatch = reconText.match(/(?:4\.\s*What conventions apply[^\n]*|##\s*Conventions[^\n]*)([\s\S]*?)(?=(?:\n\d+\.|\n##|$))/i);
+  if (!conventionsMatch || !conventionsMatch[1]) return [];
+
+  const rawLines = conventionsMatch[1].split('\n')
+    .map(l => l.replace(/^[\s\*\-\d\.\)]+/, '').trim())
+    .filter(l => l.length > 15 && !l.toLowerCase().startsWith('what conventions') && !l.toLowerCase().includes('every claim carries'));
+
+  // Return up to 4 top unique conventions
+  return Array.from(new Set(rawLines)).slice(0, 4);
+}

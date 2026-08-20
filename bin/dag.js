@@ -26,7 +26,7 @@ import {
   slugify 
 } from '../src/state.js';
 import { recordStageMetrics, getFeatureBenchmark } from '../src/metrics.js';
-import { loadProjectRules, formatRulesForPrompt, appendLearnedRule } from '../src/rules.js';
+import { loadProjectRules, formatRulesForPrompt, appendLearnedRule, extractConventionsFromRecon } from '../src/rules.js';
 import { verifyContractSpec, verifyTaskList, renderVerificationReport, verifyFullPipeline } from '../src/verifier.js';
 import { linkService, unlinkService, harvestAllLinkedServices, renderServicesList } from '../src/services.js';
 import { isFrontendTask, processUIDesignReference, formatUIContractSection } from '../src/ui-design.js';
@@ -556,6 +556,27 @@ async function runStep1() {
       break;
     }
 
+    // Optional: Discovered Conventions Promotion
+    const discoveredConventions = extractConventionsFromRecon(reconReport);
+    if (discoveredConventions.length > 0) {
+      console.log(`\n${ANSI.cyan}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+      console.log(`│ 💡 DISCOVERED ARCHITECTURAL CONVENTIONS (from 01-recon.md)         │`);
+      console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
+      for (let cIdx = 0; cIdx < discoveredConventions.length; cIdx++) {
+        console.log(`  [${cIdx + 1}] ${discoveredConventions[cIdx]}`);
+      }
+      console.log(`${ANSI.cyan}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}`);
+      const promoteAns = await askQuestion('👉 Promote any convention to permanent .dagrules? [e.g. 1,2 / none] (Default: none): ');
+      const pTrimmed = promoteAns.trim();
+      if (pTrimmed && pTrimmed.toLowerCase() !== 'none' && pTrimmed.toLowerCase() !== 'n') {
+        const selectedIndices = pTrimmed.split(/[\s,]+/).map(n => parseInt(n, 10) - 1).filter(n => !isNaN(n) && n >= 0 && n < discoveredConventions.length);
+        for (const sIdx of selectedIndices) {
+          const res = appendLearnedRule(discoveredConventions[sIdx], 'Learned Convention');
+          if (res.updated) logSuccess(`Saved permanent policy: "${discoveredConventions[sIdx]}"`);
+        }
+      }
+    }
+
     logGate('1', 'Review 02-contracts.md and 04-findings.md');
     const answer = await askQuestion('👉 Approve contract at Gate 1? [Y/n, type feedback, or "Yes and <revisions>"]: ');
     const trimmed = answer.trim();
@@ -950,6 +971,57 @@ async function main() {
           }
         } else {
           await ensureRepoInit(process.cwd(), true);
+        }
+        break;
+
+      case 'rules':
+      case 'rule':
+        const [rulesSubCmd] = args;
+        const projectRules = loadProjectRules();
+        if (rulesSubCmd === 'harvest' || rulesSubCmd === 'scan') {
+          banner('WHOLE-REPO ARCHITECTURE & CONVENTIONS HARVESTER');
+          logStep('Scanning repository conventions (1M+ Context)...', 'Google AI Studio', 'gemini-3.6-pro');
+          const repoSummary = getRepoContextSummary();
+          const harvestPrompt = `Analyze this codebase and extract the top 5 most important architectural conventions, layer boundaries, and coding standards currently practiced in the code.\n\n${repoSummary}`;
+          const reconReport = await executeStagePrompt('recon', 'Analyze repo conventions', '', { repoContext: repoSummary });
+          const discovered = extractConventionsFromRecon(reconReport);
+
+          if (discovered.length === 0) {
+            logWarning('No unambiguous conventions extracted. You can manually add rules to .dagrules');
+          } else {
+            console.log(`\n${ANSI.cyan}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+            console.log(`│ 💡 DISCOVERED REPOSITORY CONVENTIONS                               │`);
+            console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
+            for (let i = 0; i < discovered.length; i++) {
+              console.log(`  [${i + 1}] ${discovered[i]}`);
+            }
+            console.log(`${ANSI.cyan}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}`);
+            const pChoice = await askQuestion('\n👉 Select conventions to save into .dagrules [e.g. 1,2 / all / none] (Default: all): ');
+            const pTrim = pChoice.trim();
+            if (pTrim.toLowerCase() !== 'none' && pTrim.toLowerCase() !== 'n') {
+              let toSave = discovered;
+              if (pTrim && pTrim.toLowerCase() !== 'all') {
+                const indices = pTrim.split(/[\s,]+/).map(n => parseInt(n, 10) - 1).filter(n => !isNaN(n) && n >= 0 && n < discovered.length);
+                toSave = indices.map(i => discovered[i]);
+              }
+              for (const rule of toSave) {
+                appendLearnedRule(rule, 'Harvested Convention');
+              }
+              logSuccess(`Saved ${toSave.length} permanent policy rules to .dagrules!`);
+            }
+          }
+        } else {
+          console.log(`\n${ANSI.cyan}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+          console.log(`│ 📜 ACTIVE TEAM & ARCHITECTURE RULES (.dagrules)                    │`);
+          console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
+          if (projectRules.rules) {
+            console.log(projectRules.rules);
+          } else {
+            console.log(`│ No .dagrules file found. Run \`dag rules harvest\` to generate one!  │`);
+          }
+          console.log(`${ANSI.cyan}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}`);
+          console.log(`Usage:`);
+          console.log(`  dag rules harvest                Scan whole codebase & auto-generate .dagrules\n`);
         }
         break;
 
