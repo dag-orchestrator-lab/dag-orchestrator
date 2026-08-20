@@ -188,6 +188,47 @@ workflow:
   console.log(`   • Specs Directory: ${ANSI.bold}${specsDir}${ANSI.reset}`);
   console.log(`   • Harness Runner:  ${ANSI.bold}${chosenHarness}${ANSI.reset}`);
   console.log(`   • Model Preset:    ${ANSI.bold}${chosenPreset}${ANSI.reset}\n`);
+
+  // Step 4 (Optional): Auto-Harvest Repository Conventions into .dagrules
+  const rulePath = path.join(cwd, '.dagrules');
+  if (!fs.existsSync(rulePath)) {
+    const scanRules = await askQuestion('👉 Scan codebase to discover conventions & generate initial .dagrules? [Y/n] (Default: Y): ');
+    const sTrimmed = scanRules.trim().toLowerCase();
+    if (!sTrimmed || sTrimmed === 'y' || sTrimmed === 'yes') {
+      try {
+        logStep('Scanning repository conventions (1M+ Context)...', 'Google AI Studio', 'gemini-3.6-pro');
+        const repoSummary = getRepoContextSummary(cwd);
+        const reconReport = await executeStagePrompt('recon', 'Analyze repo conventions', '', { repoContext: repoSummary });
+        const discovered = extractConventionsFromRecon(reconReport);
+
+        if (discovered.length > 0) {
+          console.log(`\n${ANSI.cyan}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+          console.log(`│ 💡 DISCOVERED REPOSITORY CONVENTIONS                               │`);
+          console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
+          for (let i = 0; i < discovered.length; i++) {
+            console.log(`  [${i + 1}] ${discovered[i]}`);
+          }
+          console.log(`${ANSI.cyan}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}`);
+          const pChoice = await askQuestion('\n👉 Select conventions to save into .dagrules [e.g. 1,2 / all / none] (Default: all): ');
+          const pTrim = pChoice.trim();
+          if (pTrim.toLowerCase() !== 'none' && pTrim.toLowerCase() !== 'n') {
+            let toSave = discovered;
+            if (pTrim && pTrim.toLowerCase() !== 'all') {
+              const indices = pTrim.split(/[\s,]+/).map(n => parseInt(n, 10) - 1).filter(n => !isNaN(n) && n >= 0 && n < discovered.length);
+              toSave = indices.map(i => discovered[i]);
+            }
+            for (const rule of toSave) {
+              appendLearnedRule(rule, 'Harvested Convention', cwd);
+            }
+            logSuccess(`Saved ${toSave.length} permanent policy rules to .dagrules!\n`);
+          }
+        }
+      } catch (err) {
+        logWarning(`Could not auto-harvest rules: ${err.message}`);
+      }
+    }
+  }
+
   return loadConfig(cwd);
 }
 
