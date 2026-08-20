@@ -826,16 +826,21 @@ async function runStep3() {
   });
   console.log(implResult);
 
-  // Check if Claude requested user decision / question
-  if (/\b(how do you want to handle|option\s*\(?[a-b]\)?|before I proceed|your call|want your call|should I proceed)\b/i.test(implResult)) {
+  // Check if AI requested user decision, confirmation, clarification, or asked a question
+  const isQuestionOrClarification = (
+    /\b(how (do|would|should) you want|which option|option\s*\(?[a-d]\)?|before I (proceed|start|write)|your (call|preference|decision)|want your call|should I (proceed|create|modify)|please (confirm|clarify|choose)|let me know (if|how|which)|do you want me to|would you prefer)\b/i.test(implResult) ||
+    /(\?\s*(\n|$)|👉)/.test(implResult.slice(-300)) // Trailing question mark or prompt in last 300 chars
+  );
+
+  if (isQuestionOrClarification) {
     console.log(`\n${ANSI.brightYellow}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
-    console.log(`│ 💡 AI ASKING FOR ARCHITECTURAL DIRECTION / CLARIFICATION           │`);
+    console.log(`│ 💡 AI ASKING FOR DIRECTION, CLARIFICATION, OR CONFIRMATION         │`);
     console.log(`└────────────────────────────────────────────────────────────────────┘${ANSI.reset}`);
-    const userDecision = await askQuestion('👉 Provide your direction or choice (e.g. "Proceed with option b"): ');
+    const userDecision = await askQuestion('👉 Provide your answer / direction (or press Enter to let AI proceed with default): ');
     if (userDecision.trim()) {
-      logStep('Applying architectural direction & implementing code...', codingProvider.name, codingProvider.model);
+      logStep('Applying direction & continuing task execution...', codingProvider.name, codingProvider.model);
       implResult = await executeStagePrompt('coding', '', '', {
-        taskText: `${tasksText}\n\nUSER ARCHITECTURAL DECISION / DIRECTION:\n${userDecision.trim()}`,
+        taskText: `${tasksText}\n\nUSER DIRECTION / CLARIFICATION:\n${userDecision.trim()}`,
         contractText,
         cwd: process.cwd()
       });
