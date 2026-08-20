@@ -172,10 +172,10 @@ export function getPipelineStatus(cwd = process.cwd()) {
   // Inspect tasks progress
   if (state.hasTasks) {
     const tasksText = read(ARTIFACT_FILES.tasks);
-    const totalMatches = tasksText.match(/###\s+T-\d+/g) || [];
-    const doneMatches = tasksText.match(/\[x\]\s+T-\d+|###\s+T-\d+.*\(DONE\)/gi) || [];
+    const totalMatches = tasksText.match(/###?\s+(T-\d+|Task\s+\d+)|\- \[[ x]\]\s+(Task|T-)\s*\d+/gi) || [];
+    const doneMatches = tasksText.match(/\[x\]\s+(T-\d+|Task\s+\d+)|###?\s+T-\d+.*(\(DONE\)|\[DONE\]|—\s*DONE)|status:\s*(done|completed)/gi) || [];
     state.totalTasks = totalMatches.length;
-    state.implementedCount = doneMatches.length;
+    state.implementedCount = Math.min(doneMatches.length, totalMatches.length);
   }
 
   return state;
