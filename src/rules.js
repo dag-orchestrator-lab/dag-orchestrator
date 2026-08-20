@@ -50,13 +50,38 @@ export const RULE_PRESETS = {
   }
 };
 
-export function applyRulePreset(presetKey, cwd = process.cwd()) {
-  const preset = RULE_PRESETS[presetKey];
-  if (!preset) throw new Error(`Unknown rule preset: ${presetKey}`);
-
+export function applyRulePreset(presetKeys, cwd = process.cwd()) {
+  const keys = Array.isArray(presetKeys) ? presetKeys : [presetKeys];
   const rulePath = path.join(cwd, '.dagrules');
-  fs.writeFileSync(rulePath, preset.content.trim() + '\n');
-  return { path: rulePath, preset: preset.name, count: preset.content.split('\n- ').length - 1 };
+  let currentContent = fs.existsSync(rulePath) ? fs.readFileSync(rulePath, 'utf8').trim() : '';
+
+  const appliedNames = [];
+  let totalRulesAdded = 0;
+
+  for (const key of keys) {
+    const preset = RULE_PRESETS[key];
+    if (preset) {
+      appliedNames.push(preset.name);
+      const newRules = preset.content.trim();
+      totalRulesAdded += preset.content.split('\n- ').length - 1;
+      
+      if (!currentContent.includes(preset.name)) {
+        currentContent = currentContent ? `${currentContent}\n\n${newRules}` : newRules;
+      }
+    }
+  }
+
+  if (appliedNames.length === 0) {
+    throw new Error(`No valid rule presets specified: ${keys.join(', ')}`);
+  }
+
+  // Clamp to MAX_RULES_BYTES
+  if (Buffer.byteLength(currentContent, 'utf8') > MAX_RULES_BYTES) {
+    currentContent = currentContent.slice(0, MAX_RULES_BYTES);
+  }
+
+  fs.writeFileSync(rulePath, currentContent.trim() + '\n');
+  return { path: rulePath, preset: appliedNames.join(' + '), count: totalRulesAdded };
 }
 
 export function loadProjectRules(cwd = process.cwd()) {

@@ -231,12 +231,27 @@ workflow:
           console.log(`   ${ANSI.bold}[4] Python & FastAPI Backend${ANSI.reset}        (Pydantic v2, async DB, Mypy)`);
           console.log(`   ${ANSI.bold}[5] ⏩ Skip (Start with empty rules)${ANSI.reset}\n`);
 
-          const presetChoice = await askQuestion('Selection [1/2/3/4/5] (Default: 1): ');
+          const presetChoice = await askQuestion('Selection [e.g. 1,3 / all / 5 to skip] (Default: 1): ');
           const pTrim = presetChoice.trim() || '1';
-          const presetMap = { '1': 'typescript', '2': 'microservices', '3': 'frontend', '4': 'python' };
-          if (presetMap[pTrim]) {
-            const res = applyRulePreset(presetMap[pTrim], cwd);
-            logSuccess(`Seeded .dagrules with "${res.preset}" (${res.count} rules)!\n`);
+          if (pTrim !== '5' && pTrim.toLowerCase() !== 'skip') {
+            const presetMap = { '1': 'typescript', '2': 'microservices', '3': 'frontend', '4': 'python' };
+            let selectedKeys = [];
+            if (pTrim.toLowerCase() === 'all') {
+              selectedKeys = ['typescript', 'microservices', 'frontend', 'python'];
+            } else {
+              const tokens = pTrim.split(/[\s,]+/).map(t => t.trim());
+              for (const token of tokens) {
+                if (presetMap[token]) selectedKeys.push(presetMap[token]);
+                else if (RULE_PRESETS[token.toLowerCase()]) selectedKeys.push(token.toLowerCase());
+              }
+            }
+
+            if (selectedKeys.length > 0) {
+              const res = applyRulePreset(selectedKeys, cwd);
+              logSuccess(`Seeded .dagrules with "${res.preset}" (${res.count} rules)!\n`);
+            } else {
+              console.log('⏩ Skipped rule preset seeding.\n');
+            }
           } else {
             console.log('⏩ Skipped rule preset seeding.\n');
           }
@@ -1084,8 +1099,9 @@ async function main() {
             console.log(`  dag rules preset <name>          Apply a preset (typescript | microservices | frontend | python)\n`);
           } else {
             try {
-              const res = applyRulePreset(targetPreset.toLowerCase());
-              logSuccess(`Applied "${res.preset}" preset to .dagrules! (${res.count} rules added)\n`);
+              const presetArgs = args.slice(1);
+              const res = applyRulePreset(presetArgs);
+              logSuccess(`Applied "${res.preset}" preset(s) to .dagrules! (${res.count} rules added)\n`);
             } catch (err) {
               logError(err.message);
             }
