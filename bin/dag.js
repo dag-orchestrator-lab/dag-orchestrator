@@ -826,27 +826,37 @@ async function runStep3() {
   });
   console.log(implResult);
 
-  // Check if AI requested user decision, confirmation, clarification, or asked a question
-  const isQuestionOrClarification = (
-    /\b(how (do|would|should) you|which option|option\s*\(?[1-4a-d]\)?|before I (proceed|start|write)|your (call|preference|decision)|want your call|should I (proceed|create|modify)|please (confirm|clarify|choose)|let me know (if|how|which)|do you want me to|would you prefer|stopping here|needs a human decision)\b/i.test(implResult) ||
-    /\?\s*(\n|$)/.test(implResult) ||
-    /👉/.test(implResult)
-  );
+  // Multi-Turn Interactive Clarification & Q&A Loop with Opt-Out
+  let clarificationTurn = 0;
+  while (clarificationTurn < 4) {
+    const isQuestionOrClarification = (
+      /\b(how (do|would|should) you|which option|option\s*\(?[1-4a-d]\)?|before I (proceed|start|write|mark)|your (call|preference|decision)|want your call|should I (proceed|create|modify|add)|please (confirm|clarify|choose)|let me know (if|how|which)|do you want me to|would you prefer|stopping here|needs a human decision|want to confirm)\b/i.test(implResult) ||
+      /\?\s*(\n|$)/.test(implResult) ||
+      /👉/.test(implResult)
+    );
 
-  if (isQuestionOrClarification) {
+    if (!isQuestionOrClarification) break;
+
+    clarificationTurn++;
     console.log(`\n${ANSI.brightYellow}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
     console.log(`│ 💡 AI ASKING FOR DIRECTION, CLARIFICATION, OR CONFIRMATION         │`);
     console.log(`└────────────────────────────────────────────────────────────────────┘${ANSI.reset}`);
-    const userDecision = await askQuestion('👉 Provide your answer / direction (or press Enter to let AI proceed with default): ');
-    if (userDecision.trim()) {
-      logStep('Applying direction & continuing task execution...', codingProvider.name, codingProvider.model);
-      implResult = await executeStagePrompt('coding', '', '', {
-        taskText: `${tasksText}\n\nUSER DIRECTION / CLARIFICATION:\n${userDecision.trim()}`,
-        contractText,
-        cwd: process.cwd()
-      });
-      console.log(implResult);
+    console.log(`👉 Provide your answer / direction (or press Enter to auto-proceed, or "skip" to opt-out): `);
+    const userDecision = await askQuestion('');
+    const trimmedDecision = userDecision.trim();
+
+    if (!trimmedDecision || trimmedDecision.toLowerCase() === 'skip' || trimmedDecision.toLowerCase() === 'proceed') {
+      logStep('Proceeding with AI default execution...', codingProvider.name, codingProvider.model);
+      break;
     }
+
+    logStep('Applying direction & continuing task execution...', codingProvider.name, codingProvider.model);
+    implResult = await executeStagePrompt('coding', '', '', {
+      taskText: `${tasksText}\n\nUSER DIRECTION / CLARIFICATION (Turn ${clarificationTurn}):\n${trimmedDecision}`,
+      contractText,
+      cwd: process.cwd()
+    });
+    console.log(implResult);
   }
 
   // Feature 2: Auto-Healing Test & Verification Loop
