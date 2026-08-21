@@ -1082,7 +1082,7 @@ Format your output cleanly.`;
         logSuccess(`Updated ${addendumPath}`);
 
         // 2. Ask Claude to generate new addendum tasks and append to 05-tasks.md
-        const addendumTaskPrompt = `The user conducted manual live testing and provided the following findings/additions:\n\n${trimmedGate3}\n\nCurrent 05-tasks.md:\n${tasksText}\n\nPlease append new sequential tasks (e.g. T-${currentStatus.totalTasks + 1}, T-${currentStatus.totalTasks + 2}) to 05-tasks.md to implement and verify these findings. Follow TDD style and include specific file paths and verification Checks. Return ONLY the complete updated 05-tasks.md markdown.`;
+        const addendumTaskPrompt = `The user conducted manual live testing and provided the following findings/additions:\n\n${trimmedGate3}\n\nCurrent 05-tasks.md:\n${tasksText}\n\nPlease append new sequential tasks (e.g. T-${currentStatus.totalTasks + 1}, T-${currentStatus.totalTasks + 2}) to 05-tasks.md to implement and verify these findings. Follow TDD style and include specific file paths and verification Checks. CRITICAL: Leave new tasks UNMARKED (do NOT mark them [DONE] or (DONE) — they must remain pending for the implementation stage). Return ONLY the complete updated 05-tasks.md markdown.`;
         
         const updatedTasks = await executeStagePrompt('coding', addendumTaskPrompt, '', {
           taskText: addendumTaskPrompt,
