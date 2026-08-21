@@ -1385,29 +1385,31 @@ async function runShip(args = []) {
   if (ghInstalled) {
     const createPR = await askQuestion('\n👉 Open Pull Request on GitHub now (`gh pr create`)? [Y/n] (Default: Y): ');
     if (!createPR.trim() || createPR.toLowerCase() === 'y' || createPR.toLowerCase() === 'yes') {
-      // Derive smart PR title matching <Prefix>/<Ticket> - <Title> or commit message
-      let defaultPrTitle = commitTitle || args.join(' ');
-      if (!defaultPrTitle) {
-        let branchName = '';
-        try {
-          branchName = execSync('git branch --show-current', { encoding: 'utf8', cwd: process.cwd() }).trim();
-        } catch (e) {}
+      // Derive smart PR title matching <Prefix>/<Ticket Number on Jira> - <Title> (Confluence standard)
+      let branchName = '';
+      try {
+        branchName = execSync('git branch --show-current', { encoding: 'utf8', cwd: process.cwd() }).trim();
+      } catch (e) {}
 
-        const ticketMatch = branchName.match(/(?:feat|fix|chore|hotfix)\/([A-Z]+-\d+)/i) || branchName.match(/([A-Z]+-\d+)/i);
-        const prefix = branchName.startsWith('fix') ? 'fix' : (branchName.startsWith('chore') ? 'chore' : 'feat');
-        const ticket = ticketMatch ? ticketMatch[1].toUpperCase() : 'DC-XXX';
-        
-        let featureGoal = 'Implement Feature';
-        const reqPath = resolveArtifactPath('00-requirements.md');
-        if (fs.existsSync(reqPath)) {
-          const reqText = fs.readFileSync(reqPath, 'utf8');
-          const titleMatch = reqText.match(/^#\s*([^\n]+)/m);
-          if (titleMatch && titleMatch[1]) {
-            featureGoal = titleMatch[1].replace(/^(Feature\s*Request|Feature\s*Goal|Requirements):\s*/i, '').trim();
-          }
+      const ticketMatch = branchName.match(/(?:feat|fix|chore|hotfix)\/([A-Z]+-\d+)/i) || branchName.match(/([A-Z]+-\d+)/i);
+      const prefix = branchName.startsWith('fix') ? 'fix' : (branchName.startsWith('chore') ? 'chore' : (branchName.startsWith('hotfix') ? 'hotfix' : 'feat'));
+      const ticket = ticketMatch ? ticketMatch[1].toUpperCase() : 'DC-XXX';
+      
+      let featureGoal = 'Dynamic Campaign Live Dashboard';
+      const reqPath = resolveArtifactPath('00-requirements.md');
+      if (fs.existsSync(reqPath)) {
+        const reqText = fs.readFileSync(reqPath, 'utf8');
+        const titleMatch = reqText.match(/^#\s*([^\n]+)/m) || reqText.match(/Feature:\s*([^\n]+)/i);
+        if (titleMatch && titleMatch[1]) {
+          featureGoal = titleMatch[1]
+            .replace(/^(Feature\s*Request|Feature\s*Goal|Requirements|Feature):\s*/i, '')
+            .replace(/^(feat|fix|chore):\s*/i, '')
+            .trim();
         }
-        defaultPrTitle = `${prefix}/${ticket} - ${featureGoal}`;
       }
+
+      // Format title cleanly
+      const defaultPrTitle = `${prefix}/${ticket} - ${featureGoal}`;
 
       console.log(`\n💡 Suggested PR Title: ${ANSI.bold}${ANSI.cyan}${defaultPrTitle}${ANSI.reset}`);
       const userPrTitle = await askQuestion(`👉 Enter Pull Request Title (Press Enter to accept suggestion): `);
