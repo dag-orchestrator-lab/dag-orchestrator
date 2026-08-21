@@ -146,11 +146,11 @@ IMPORTANT: Do NOT use tools or ask for permissions. Output the markdown review d
  * Step 5 / Ship: AI Synthesis of Concise PR Description conforming to Confluence template
  */
 export async function claudeGeneratePrDescription(context, cwd = process.cwd()) {
-  const { reqContent, contractContent, tasksContent, gitDiff, templateContent } = context;
+  const { reqContent, contractContent, tasksContent, gitDiff, gitLogSummary, templateContent } = context;
 
-  const prompt = `You are writing a clean, professional, and human-readable Pull Request (PR) description.
+  const prompt = `You are writing a clean, accurate, and human-readable Pull Request (PR) description conforming strictly to the repository's Confluence template.
 
-Template to follow:
+Target Template Format:
 ${templateContent || `
 # Description
 Briefly describe what this PR does (2-3 concise bullet points).
@@ -179,21 +179,26 @@ Tested by:
 Any non-obvious context or caveats for reviewers.
 `}
 
-Context Inputs:
-- Feature Requirements:
-${reqContent.slice(0, 1500)}
+Actual Code Changes (Committed Git Log & Diff):
+${gitLogSummary ? `Commit History:\n${gitLogSummary}\n` : ''}
+Git Diff (What was actually changed/added/deleted in code):
+${gitDiff || 'No git diff detected'}
+
+Feature Context & Tasks:
+- Feature Goal:
+${reqContent.slice(0, 1000)}
 
 - Completed Tasks:
-${tasksContent.slice(0, 2000)}
+${tasksContent.slice(0, 1500)}
 
-- Git Diff:
-${gitDiff.slice(0, 3000)}
-
-Instructions:
-1. Do NOT dump raw markdown files or entire contract specs into the PR.
-2. Synthesize concise, human-readable bullet points explaining WHY the change was made, WHAT was touched, and HOW it was tested.
-3. Common words only, avoid fluff or synthetic boilerplate.
-4. Output ONLY the raw markdown of the PR description, no introductory chat.`;
+CRITICAL INSTRUCTIONS:
+1. Base your description and bullet points on the ACTUAL CODE MODIFICATIONS in the Git Diff and Commit History.
+2. Under "# Description", explain what the PR accomplishes in 2-4 clean bullet points.
+3. Under "# Changes", categorize the actual files/functions into "* Added:", "* Updated:", and "* Removed:".
+4. Under "# Testing", check all passing test boxes and list concrete verification checks performed (e.g. unit tests passing, manual UI checks).
+5. Do NOT dump raw markdown files, raw contract specs, or internal recon notes.
+6. Use plain, common, human-readable words. Avoid AI fluff.
+7. Output ONLY the raw markdown of the PR description without conversational preambles.`;
 
   return await runClaudePrompt(prompt, cwd);
 }

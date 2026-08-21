@@ -1290,10 +1290,13 @@ async function runShip(args = []) {
   const tasksContent = fs.existsSync(tasksPath) ? fs.readFileSync(tasksPath, 'utf8') : '';
   const reviewContent = fs.existsSync(reviewPath) ? fs.readFileSync(reviewPath, 'utf8') : '';
 
-  // Get active git diff for smart change summary
+  // Get active committed git diff and commit log against base branch
   let gitDiff = '';
+  let gitLogSummary = '';
+  const baseTarget = config.STACKED_BASE_BRANCH || 'develop';
   try {
-    gitDiff = execSync('git diff origin/HEAD...HEAD || git diff HEAD~1 || git diff', { encoding: 'utf8', cwd: process.cwd() }).slice(0, 4000);
+    gitDiff = execSync(`git diff origin/${baseTarget}...HEAD || git diff HEAD~1 || git diff`, { encoding: 'utf8', cwd: process.cwd() }).slice(0, 5000);
+    gitLogSummary = execSync(`git log origin/${baseTarget}..HEAD --oneline || git log -n 5 --oneline`, { encoding: 'utf8', cwd: process.cwd() });
   } catch (e) {}
 
   // Check for repository or team PR template
@@ -1339,6 +1342,7 @@ async function runShip(args = []) {
         contractContent,
         tasksContent,
         gitDiff,
+        gitLogSummary,
         templateContent: customTemplateText
       }, process.cwd());
       logSuccess('AI PR description generated successfully!');
