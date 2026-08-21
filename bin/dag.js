@@ -74,20 +74,20 @@ async function ensureRepoInit(cwd = process.cwd(), force = false) {
   console.log(`This is the first time running DAG in this repository.`);
 
   console.log(`\n👉 Where should DAG store feature specification documents?`);
-  console.log(`   ${ANSI.bold}[1] Committed with codebase${ANSI.reset} → ${ANSI.cyan}docs/features/<feature-name>/${ANSI.reset} (Default)`);
-  console.log(`   ${ANSI.bold}[2] Gitignored private workspace${ANSI.reset} → ${ANSI.cyan}.dag/features/<feature-name>/${ANSI.reset}`);
+  console.log(`   ${ANSI.bold}[1] Committed team specs${ANSI.reset} → ${ANSI.cyan}dag/features/<feature-name>/${ANSI.reset} (Default - Shared living ADRs)`);
+  console.log(`   ${ANSI.bold}[2] Gitignored local workspace${ANSI.reset} → ${ANSI.cyan}.dag/features/<feature-name>/${ANSI.reset} (Private / local-only)`);
 
   const choice = await askQuestion('\nSelection [1/2] (Default: 1): ');
   const trimmed = choice.trim();
 
-  let specsDir = 'docs/features';
+  let specsDir = 'dag/features';
   let shouldGitignore = false;
 
   if (trimmed === '2') {
     specsDir = '.dag/features';
     shouldGitignore = true;
   } else {
-    specsDir = 'docs/features';
+    specsDir = 'dag/features';
     shouldGitignore = false;
   }
 
