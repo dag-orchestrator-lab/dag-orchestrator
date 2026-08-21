@@ -9,6 +9,10 @@
   },
   "scripts": {
     "dag": "node bin/dag.js",
-    "dsh": "npx @deepseek-ai/dsh web"
+    "dsh": "npx @deepseek-ai/dsh web",
+    "build": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
   }
 }

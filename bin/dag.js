@@ -981,7 +981,7 @@ async function runStep3() {
 
         // Auto-mark the task as completed [x] in 05-tasks.md
         if (activeTaskId && activeTaskIndex !== -1) {
-          const updatedBlock = activeTaskBlock.replace(
+          const updatedBlock = block.replace(
             /###\s+(?:\[[ x]\]\s*)?(T-\d+)/i,
             '### [x] $1'
           );

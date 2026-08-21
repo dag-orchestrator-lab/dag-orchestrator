@@ -1,4 +1,5 @@
 node_modules/
+dist/
 .env
 *.env
 .dag/
@@ -9,3 +10,4 @@ node_modules/
 *.pdf
 *.log
 .DS_Store
+.dagrules.local
