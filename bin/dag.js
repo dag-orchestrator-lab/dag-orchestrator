@@ -1277,8 +1277,12 @@ ${findingsContent}
 ${tasksContent}
 `;
 
-  fs.writeFileSync('PR_DESCRIPTION.md', prBody);
-  logSuccess('Generated PR_DESCRIPTION.md');
+  const prPath = fs.existsSync(path.join(process.cwd(), '.dag'))
+    ? path.join(process.cwd(), '.dag', 'PR_DESCRIPTION.md')
+    : resolveArtifactPath('PR_DESCRIPTION.md');
+
+  fs.writeFileSync(prPath, prBody);
+  logSuccess(`Generated ${path.relative(process.cwd(), prPath)}`);
 
   // 3. Ask whether to open PR via GitHub CLI
   let ghInstalled = false;
@@ -1293,18 +1297,18 @@ ${tasksContent}
       const prTitle = commitTitle || args.join(' ') || await askQuestion('👉 Enter Pull Request Title: ');
       try {
         logStep('Creating GitHub Pull Request...', 'GitHub CLI', 'gh pr create');
-        const prOutput = execSync(`gh pr create --title "${prTitle.replace(/"/g, '\\"')}" --body-file PR_DESCRIPTION.md`, {
+        const prOutput = execSync(`gh pr create --title "${prTitle.replace(/"/g, '\\"')}" --body-file "${prPath}"`, {
           encoding: 'utf8'
         });
         logSuccess(`Pull Request Created:\n${prOutput}`);
       } catch (err) {
-        logWarning(`Could not auto-create PR via gh: ${err.message}. You can manually paste PR_DESCRIPTION.md into your PR.`);
+        logWarning(`Could not auto-create PR via gh: ${err.message}. You can manually paste ${path.relative(process.cwd(), prPath)} into your PR.`);
       }
     } else {
-      console.log(`\n${ANSI.cyan}ℹ️  PR creation skipped. All changes are committed/pushed and documentation saved in PR_DESCRIPTION.md.${ANSI.reset}\n`);
+      console.log(`\n${ANSI.cyan}ℹ️  PR creation skipped. All changes are committed/pushed and documentation saved in ${path.relative(process.cwd(), prPath)}.${ANSI.reset}\n`);
     }
   } else {
-    logWarning('GitHub CLI (`gh`) not detected. Your complete PR description is saved in `PR_DESCRIPTION.md`.');
+    logWarning(`GitHub CLI (\`gh\`) not detected. Your complete PR description is saved in \`${path.relative(process.cwd(), prPath)}\`.`);
   }
 }
 
