@@ -78,14 +78,14 @@ export async function executeStagePrompt(stageName, prompt, systemPrompt = '', o
     if (stageName === 'skeptic') return await geminiSkeptic(prompt);
     if (stageName === 'layers') return await geminiLayerFanout(options.layerType, prompt, options.reconText);
     if (stageName === 'conformance') return await geminiPlanConformance(options.contractText, options.tasksText, options.gitDiff);
-    if (stageName === 'review') return await geminiRepoImpactReview(prompt, options.repoContext);
+    if (stageName === 'review' || stageName === 'impact') return await geminiRepoImpactReview(prompt || options.diffText, options.repoContext);
   }
 
   if (provider.type === 'claude') {
     if (stageName === 'contract') return await claudeDraftContract(options.reqText, options.reconText, options.templateText, options.cwd, options.feedback);
     if (stageName === 'merge') return await claudePlanMerger(options.contractText, options.layerPlans, options.findingsText, options.cwd);
     if (stageName === 'coding') return await claudeImplementTask(options.taskText, options.contractText, options.cwd);
-    if (stageName === 'review') return await claudeCodeReview(options.diffText, options.reviewRulesText, options.cwd);
+    if (stageName === 'review' || stageName === 'code-review') return await claudeCodeReview(options.diffText || prompt, options.reviewRulesText, options.cwd);
   }
 
   // Fallback to OpenAI / Ollama generic provider interface

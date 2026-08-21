@@ -1083,7 +1083,7 @@ async function runStep4() {
 
   const claudeReviewProvider = getProviderForStage('coding');
   logStep('Final REVIEW.md Quality Check', claudeReviewProvider.name, claudeReviewProvider.model);
-  const reviewResult = await executeStagePrompt('review', '', '', {
+  const reviewResult = await executeStagePrompt('code-review', gitDiff, '', {
     diffText: gitDiff,
     reviewRulesText: 'Check for correctness, simplicity, and reuse.',
     cwd: process.cwd()
