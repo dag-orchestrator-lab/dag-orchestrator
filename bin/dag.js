@@ -1796,6 +1796,36 @@ ${tasksContent}
         fs.writeFileSync('PR_DESCRIPTION.md', prBody);
         logSuccess('Generated PR_DESCRIPTION.md');
 
+        // Check for unstaged / uncommitted changes
+        let gitStatus = '';
+        try {
+          gitStatus = execSync('git status --short', { encoding: 'utf8', cwd: process.cwd() }).trim();
+        } catch (e) {}
+
+        if (gitStatus) {
+          console.log(`\n${ANSI.brightYellow}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+          console.log(`│ 📝 UNCOMMITTED CHANGES DETECTED IN WORKING TREE                     │`);
+          console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
+          console.log(gitStatus.split('\n').map(l => `  ${l}`).slice(0, 15).join('\n'));
+          console.log(`${ANSI.brightYellow}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}`);
+
+          const doCommit = await askQuestion('👉 Stage all modified feature files, commit, and push branch now? [Y/n] (Default: Y): ');
+          if (!doCommit.trim() || doCommit.toLowerCase() === 'y' || doCommit.toLowerCase() === 'yes') {
+            try {
+              logStep('Staging and committing feature files...', 'Git', 'git commit');
+              execSync('git add -A', { stdio: 'inherit', cwd: process.cwd() });
+              execSync(`git commit -m "${prTitle.replace(/"/g, '\\"')}"`, { stdio: 'inherit', cwd: process.cwd() });
+              logSuccess('Commit created successfully!');
+
+              logStep('Pushing branch to origin...', 'Git', 'git push');
+              execSync('git push origin HEAD', { stdio: 'inherit', cwd: process.cwd() });
+              logSuccess('Branch pushed to origin successfully!');
+            } catch (commitErr) {
+              logWarning(`Git commit/push encountered a notice: ${commitErr.message}`);
+            }
+          }
+        }
+
         // Check if gh CLI is available
         let ghInstalled = false;
         try {
