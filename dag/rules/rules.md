@@ -21,3 +21,11 @@
 - **Pure Core, Impure Shell**: Separate pure logic (parsing, regex audits, state transitions, metric cost formulas) from impure side-effects (disk IO, child process execution, console prompts) to enable clean unit testing.
 - **TDD Requirement**: Every pure module function in \`src/state.ts\`, \`src/verifier.ts\`, \`src/rules.ts\`, and \`src/metrics.ts\` must have a corresponding Vitest test suite (\`__tests__/*.test.ts\`) covering normal paths, error cases, and boundary conditions.
 - **Subprocess Safety**: Never perform unescaped string interpolation into shell commands; pass arguments as arrays to \`spawn\` / safe exec helpers.
+
+## 5. Domain-Driven Design & Onion Architecture Standards
+- **Rich Domain Models (No Anemic Models)**: Domain entities must encapsulate both state and business behavior (e.g. \`FeatureWorkspace\`, \`PipelineStage\`, \`GateApproval\`). Data-only DTOs are restricted to infrastructure serialization.
+- **Onion Layer Dependency Inversion**: Dependencies must strictly point inwards:
+  \`Infrastructure (CLI, fs, child_process) -> Application Services (Use Cases) -> Domain Services (Algorithms) -> Core Entities & Value Objects\`.
+  Core domain classes must never import \`node:fs\`, \`node:child_process\`, or external network libraries.
+- **Value Objects**: Encapsulate primitive validation into immutable Value Objects (e.g. \`FeatureName\`, \`JiraTicket\`, \`TokenMetrics\`) using private constructors and factory methods (\`create()\`).
+- **Result Types for Domain Errors**: Domain operations that can fail expectedly must return explicit \`Result<T, DomainError>\` types rather than throwing untyped runtime exceptions.
