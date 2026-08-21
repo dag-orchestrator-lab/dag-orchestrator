@@ -1180,6 +1180,33 @@ async function runShip(args = []) {
     logError('Cannot ship: 02-contracts.md is missing. Run `dag contract` first.');
     return;
   }
+  // 0. Stacked Feature Branch Gate: Check if user is on the intended stacked branch
+  const config = loadConfig();
+  let currentGitBranch = '';
+  try {
+    currentGitBranch = execSync('git branch --show-current', { encoding: 'utf8', cwd: process.cwd() }).trim();
+  } catch (e) {}
+
+  if (config.ACTIVE_BRANCH && currentGitBranch && config.ACTIVE_BRANCH !== currentGitBranch) {
+    console.log(`\n${ANSI.brightYellow}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+    console.log(`│ ⚠️  STACKED FEATURE BRANCH MISMATCH                                 │`);
+    console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
+    console.log(`  Current Git Branch:   ${ANSI.bold}${ANSI.red}${currentGitBranch}${ANSI.reset}`);
+    console.log(`  Stacked Feature Branch: ${ANSI.bold}${ANSI.green}${config.ACTIVE_BRANCH}${ANSI.reset}`);
+    console.log(`${ANSI.brightYellow}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}`);
+
+    const doSwitch = await askQuestion(`👉 Switch to the intended stacked branch '${config.ACTIVE_BRANCH}' now? [Y/n] (Default: Y): `);
+    if (!doSwitch.trim() || doSwitch.toLowerCase() === 'y' || doSwitch.toLowerCase() === 'yes') {
+      try {
+        logStep(`Switching to stacked branch '${config.ACTIVE_BRANCH}'...`, 'Git', 'git checkout');
+        execSync(`git checkout "${config.ACTIVE_BRANCH}"`, { stdio: 'inherit', cwd: process.cwd() });
+        currentGitBranch = config.ACTIVE_BRANCH;
+        logSuccess(`Checked out to '${currentGitBranch}' successfully!`);
+      } catch (switchErr) {
+        logError(`Could not switch branch: ${switchErr.message}`);
+      }
+    }
+  }
 
   // 1. First Check for unstaged / uncommitted changes
   let gitStatus = '';
