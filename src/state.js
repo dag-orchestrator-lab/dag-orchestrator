@@ -14,7 +14,8 @@ export const ARTIFACT_FILES = {
   tasks: '05-tasks.md',
   review: 'REVIEW.md',
   prDescription: 'PR_DESCRIPTION.md',
-  gatesState: '.dag-gates.json'
+  gatesState: '.dag-gates.json',
+  contextMeta: '.dag-context.json'
 };
 
 export function slugify(text) {
@@ -23,6 +24,28 @@ export function slugify(text) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)+/g, '')
     .slice(0, 50);
+}
+
+export function getFeatureContextMeta(featureDir) {
+  const metaPath = path.join(featureDir, ARTIFACT_FILES.contextMeta);
+  if (fs.existsSync(metaPath)) {
+    try {
+      return JSON.parse(fs.readFileSync(metaPath, 'utf8'));
+    } catch (e) {}
+  }
+  return null;
+}
+
+export function saveFeatureContextMeta(featureDir, metaData = {}) {
+  const metaPath = path.join(featureDir, ARTIFACT_FILES.contextMeta);
+  let existing = getFeatureContextMeta(featureDir) || {};
+  const merged = {
+    ...existing,
+    ...metaData,
+    lastUpdated: new Date().toISOString()
+  };
+  fs.writeFileSync(metaPath, JSON.stringify(merged, null, 2));
+  return merged;
 }
 
 export function getFeatureWorkspaceDir(cwd = process.cwd()) {
@@ -56,7 +79,7 @@ export function getFeatureWorkspaceDir(cwd = process.cwd()) {
   }
 
   // 3. Auto-create in default specs dir (dag/features/current-feature)
-  const defaultBase = path.join(cwd, config.SPECS_DIR || 'dag/features');
+  const defaultBase = path.join(cwd, config.SPECS_DIR || '.dag/features');
   const defaultDir = path.join(defaultBase, 'current-feature');
   if (!fs.existsSync(defaultDir)) {
     fs.mkdirSync(defaultDir, { recursive: true });
@@ -81,27 +104,106 @@ export function listAllFeatures(cwd = process.cwd()) {
   const searchDirs = [
     config.SPECS_DIR ? path.join(cwd, config.SPECS_DIR) : null,
     path.join(cwd, 'docs', 'features'),
-    path.join(cwd, '.dag', 'features')
+    path.join(cwd, '.dag', 'features'),
+    path.join(cwd, 'dag', 'features')
   ].filter(Boolean);
+
+  const seen = new Set();
 
   for (const dir of searchDirs) {
     if (fs.existsSync(dir)) {
       const items = fs.readdirSync(dir);
       for (const item of items) {
         const full = path.join(dir, item);
-        if (fs.statSync(full).isDirectory()) {
+        if (fs.statSync(full).isDirectory() && !seen.has(item)) {
+          seen.add(item);
           const hasReq = fs.existsSync(path.join(full, '00-requirements.md'));
           const hasContract = fs.existsSync(path.join(full, '02-contracts.md'));
           const hasTasks = fs.existsSync(path.join(full, '05-tasks.md'));
           const hasReview = fs.existsSync(path.join(full, 'REVIEW.md'));
+          const meta = getFeatureContextMeta(full) || {};
+          
+          let title = meta.title || item;
+          if (!meta.title && hasReq) {
+            try {
+              const reqText = fs.readFileSync(path.join(full, '00-requirements.md'), 'utf8');
+              const titleMatch = reqText.match(/^#\s*([^\n]+)/m) || reqText.match(/Feature:\s*([^\n]+)/i);
+              if (titleMatch && titleMatch[1]) {
+                title = titleMatch[1].replace(/^(Feature\s*Request|Feature\s*Goal|Requirements|Feature):\s*/i, '').trim();
+              }
+            } catch (e) {}
+          }
+
           results.push({
             name: item,
+            title,
             path: full,
             hasReq,
             hasContract,
             hasTasks,
             hasReview,
+            meta,
+            status: meta.status || (meta.shipped ? 'SHIPPED' : (hasTasks ? 'PAUSED' : 'DRAFT')),
             isCurrent: full === getFeatureWorkspaceDir(cwd)
+          });
+        }
+      }
+    }
+  }
+
+  return results;
+}
+
+export function listArchivedFeatures(cwd = process.cwd()) {
+  const searchDirs = [
+    path.join(cwd, '.dag', 'archive'),
+    path.join(cwd, 'dag', 'archive')
+  ];
+
+  const results = [];
+  const seen = new Set();
+
+  for (const dir of searchDirs) {
+    if (fs.existsSync(dir)) {
+      const items = fs.readdirSync(dir);
+      for (const item of items) {
+        const full = path.join(dir, item);
+        if (fs.statSync(full).isDirectory() && !seen.has(item)) {
+          seen.add(item);
+          const hasReq = fs.existsSync(path.join(full, '00-requirements.md'));
+          const hasContract = fs.existsSync(path.join(full, '02-contracts.md'));
+          const hasTasks = fs.existsSync(path.join(full, '05-tasks.md'));
+          const hasReview = fs.existsSync(path.join(full, 'REVIEW.md'));
+          const hasPr = fs.existsSync(path.join(full, 'PR_DESCRIPTION.md'));
+          const meta = getFeatureContextMeta(full) || {};
+
+          let title = meta.title || item;
+          if (!meta.title && hasReq) {
+            try {
+              const reqText = fs.readFileSync(path.join(full, '00-requirements.md'), 'utf8');
+              const titleMatch = reqText.match(/^#\s*([^\n]+)/m) || reqText.match(/Feature:\s*([^\n]+)/i);
+              if (titleMatch && titleMatch[1]) {
+                title = titleMatch[1].replace(/^(Feature\s*Request|Feature\s*Goal|Requirements|Feature):\s*/i, '').trim();
+              }
+            } catch (e) {}
+          }
+
+          let status = meta.status;
+          if (!status) {
+            status = (hasPr || meta.shipped) ? 'SHIPPED' : (hasTasks ? 'PAUSED' : 'DRAFT');
+          }
+
+          results.push({
+            name: item,
+            title,
+            path: full,
+            hasReq,
+            hasContract,
+            hasTasks,
+            hasReview,
+            hasPr,
+            meta,
+            status
           });
         }
       }
@@ -146,10 +248,6 @@ export function getPipelineStatus(cwd = process.cwd()) {
     } catch (e) {}
   }
 
-  const gate1Approved = !!gates.gate1?.approved;
-  const gate2Approved = !!gates.gate2?.approved;
-  const gate3Approved = !!gates.gate3?.approved;
-
   const state = {
     workspaceDir,
     hasRequirements: has(ARTIFACT_FILES.requirements),
@@ -159,25 +257,17 @@ export function getPipelineStatus(cwd = process.cwd()) {
     hasDomain: has(ARTIFACT_FILES.domain),
     hasAppInfra: has(ARTIFACT_FILES.appInfra),
     hasData: has(ARTIFACT_FILES.data),
+    hasLayerFindings: has(ARTIFACT_FILES.layerFindings),
     hasTasks: has(ARTIFACT_FILES.tasks),
     hasReview: has(ARTIFACT_FILES.review),
-    gate1Approved,
-    gate2Approved,
-    gate3Approved,
-    blockers: [],
-    majors: [],
-    implementedCount: 0,
-    totalTasks: 0
+    hasPrDescription: has(ARTIFACT_FILES.prDescription),
+    gate1Approved: !!gates.gate1?.approved,
+    gate2Approved: !!gates.gate2?.approved,
+    gate3Approved: !!gates.gate3?.approved,
+    gate4Approved: !!gates.gate4?.approved,
+    totalTasks: 0,
+    implementedCount: 0
   };
-
-  // Inspect findings for blockers
-  if (state.hasFindings) {
-    const findingsText = read(ARTIFACT_FILES.findings);
-    const blockerMatches = findingsText.match(/BLOCKER[^\n]*/gi) || [];
-    state.blockers = blockerMatches;
-    const majorMatches = findingsText.match(/MAJOR[^\n]*/gi) || [];
-    state.majors = majorMatches;
-  }
 
   // Inspect tasks progress
   if (state.hasTasks) {
@@ -230,7 +320,7 @@ export function cleanArtifacts(cwd = process.cwd()) {
   return { backupDir, removed };
 }
 
-export function archiveFeatureWorkspace(destinationType = 'archive', featureName = '', cwd = process.cwd()) {
+export function archiveFeatureWorkspace(destinationType = 'archive', featureName = '', customMeta = {}, cwd = process.cwd()) {
   const config = loadConfig(cwd);
   const currentDir = getFeatureWorkspaceDir(cwd);
 
@@ -238,19 +328,48 @@ export function archiveFeatureWorkspace(destinationType = 'archive', featureName
     return { success: false, message: 'No active feature workspace found to archive.' };
   }
 
+  // Check if currentDir has any artifacts at all
+  const status = getPipelineStatus(cwd);
+  if (!status.hasRequirements && !status.hasContracts && !status.hasTasks) {
+    return { success: false, message: 'Current workspace is empty. Nothing to archive.' };
+  }
+
+  let title = featureName;
+  if (!title && status.hasRequirements) {
+    try {
+      const reqText = fs.readFileSync(path.join(currentDir, '00-requirements.md'), 'utf8');
+      const titleMatch = reqText.match(/^#\s*([^\n]+)/m) || reqText.match(/Feature:\s*([^\n]+)/i);
+      if (titleMatch && titleMatch[1]) {
+        title = titleMatch[1].replace(/^(Feature\s*Request|Feature\s*Goal|Requirements|Feature):\s*/i, '').trim();
+      }
+    } catch (e) {}
+  }
+
+  const cleanName = slugify(featureName || title) || `feature-${Date.now()}`;
+
+  // Save metadata into currentDir before moving
+  saveFeatureContextMeta(currentDir, {
+    name: cleanName,
+    title: title || cleanName,
+    branch: customMeta.branch || config.ACTIVE_BRANCH || null,
+    baseBranch: customMeta.baseBranch || config.STACKED_BASE_BRANCH || null,
+    lastCommit: customMeta.lastCommit || null,
+    status: customMeta.status || (status.hasPrDescription ? 'SHIPPED' : (status.hasTasks ? 'PAUSED' : 'DRAFT')),
+    tasksProgress: {
+      total: status.totalTasks,
+      done: status.implementedCount
+    }
+  });
+
   const baseSpecsDir = path.join(cwd, config.SPECS_DIR || '.dag/features');
   let targetDir = '';
 
-  const cleanName = slugify(featureName) || `feature-${Date.now()}`;
-
   if (destinationType === 'archive') {
-    // Move to .dag/archive/<feature-name> or dag/archive/<feature-name>
     const archiveBase = config.SPECS_DIR?.startsWith('.dag') 
       ? path.join(cwd, '.dag', 'archive')
       : path.join(cwd, 'dag', 'archive');
     targetDir = path.join(archiveBase, cleanName);
   } else {
-    // Rename/move inside the features folder: [SPECS_DIR]/<clean-feature-name>
     targetDir = path.join(baseSpecsDir, cleanName);
   }
 
@@ -265,14 +384,73 @@ export function archiveFeatureWorkspace(destinationType = 'archive', featureName
   fs.renameSync(currentDir, targetDir);
 
   // Clear ACTIVE_FEATURE in config if it was set
-  if (config.ACTIVE_FEATURE) {
-    saveLocalConfig({ ACTIVE_FEATURE: null, ACTIVE_BRANCH: null, STACKED_BASE_BRANCH: null }, cwd);
-  }
+  saveLocalConfig({ ACTIVE_FEATURE: null, ACTIVE_BRANCH: null, STACKED_BASE_BRANCH: null }, cwd);
 
   return {
     success: true,
     previousDir: currentDir,
     targetDir,
+    featureName: cleanName
+  };
+}
+
+export function activateFeatureWorkspace(featureName, cwd = process.cwd()) {
+  const config = loadConfig(cwd);
+  const cleanName = slugify(featureName);
+
+  // Find the feature in archive or features folder
+  const candidatePaths = [
+    path.join(cwd, '.dag', 'archive', cleanName),
+    path.join(cwd, 'dag', 'archive', cleanName),
+    path.join(cwd, '.dag', 'features', cleanName),
+    path.join(cwd, 'dag', 'features', cleanName),
+    path.join(cwd, config.SPECS_DIR || '.dag/features', cleanName)
+  ];
+
+  let sourceDir = candidatePaths.find(p => fs.existsSync(p) && fs.statSync(p).isDirectory());
+
+  if (!sourceDir) {
+    return { success: false, message: `Could not find archived or stored feature '${cleanName}'.` };
+  }
+
+  const currentDir = getFeatureWorkspaceDir(cwd);
+
+  // Auto-archive current workspace if it has content and is not the same directory
+  if (currentDir !== sourceDir && fs.existsSync(currentDir)) {
+    const currentStatus = getPipelineStatus(cwd);
+    if (currentStatus.hasRequirements || currentStatus.hasContracts) {
+      archiveFeatureWorkspace('archive', '', {}, cwd);
+    }
+  }
+
+  // Restore sourceDir to current-feature
+  const targetDir = path.join(cwd, config.SPECS_DIR || '.dag/features', 'current-feature');
+  fs.mkdirSync(path.dirname(targetDir), { recursive: true });
+
+  if (fs.existsSync(targetDir)) {
+    // If targetDir already exists (e.g. empty), remove it to cleanly replace
+    fs.rmSync(targetDir, { recursive: true, force: true });
+  }
+
+  // Move sourceDir to targetDir
+  fs.renameSync(sourceDir, targetDir);
+
+  // Read restored metadata
+  const meta = getFeatureContextMeta(targetDir) || {};
+  meta.status = 'ACTIVE';
+  saveFeatureContextMeta(targetDir, meta);
+
+  // Update local config
+  saveLocalConfig({
+    ACTIVE_FEATURE: 'current-feature',
+    ACTIVE_BRANCH: meta.branch || null,
+    STACKED_BASE_BRANCH: meta.baseBranch || null
+  }, cwd);
+
+  return {
+    success: true,
+    targetDir,
+    meta,
     featureName: cleanName
   };
 }

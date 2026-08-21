@@ -20,6 +20,10 @@ import {
   createRollbackSnapshot, 
   cleanArtifacts, 
   archiveFeatureWorkspace,
+  activateFeatureWorkspace,
+  listArchivedFeatures,
+  getFeatureContextMeta,
+  saveFeatureContextMeta,
   recordGateApproval, 
   resolveArtifactPath, 
   getFeatureWorkspaceDir, 
@@ -2013,6 +2017,202 @@ async function main() {
         }
         break;
 
+      case 'archive':
+      case 'archives': {
+        const [subAction, targetName] = args;
+        const archivedList = listArchivedFeatures(process.cwd());
+
+        if (subAction === 'list' || (!subAction && args.length === 0 && archivedList.length > 0 && !getPipelineStatus().hasRequirements)) {
+          // Display archived features table
+          console.log(`\n${ANSI.cyan}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+          console.log(`│ 📦 ARCHIVED FEATURE WORKSPACES                                     │`);
+          console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
+          if (archivedList.length === 0) {
+            console.log(`│  (No archived features found in .dag/archive/ or dag/archive/)     │`);
+          } else {
+            archivedList.forEach((feat, idx) => {
+              const statusBadge = feat.status === 'SHIPPED' 
+                ? `${ANSI.brightGreen}[SHIPPED]${ANSI.reset}` 
+                : (feat.status === 'PAUSED' ? `${ANSI.brightYellow}[PAUSED]${ANSI.reset}` : `${ANSI.cyan}[DRAFT]${ANSI.reset}`);
+              const branchStr = feat.meta.branch ? `${ANSI.dim}(${feat.meta.branch})${ANSI.reset}` : '';
+              console.log(`  [${idx + 1}] ${ANSI.bold}${feat.name.padEnd(28)}${ANSI.reset} ${statusBadge} ${branchStr}`);
+              if (feat.title && feat.title !== feat.name) {
+                console.log(`      ${ANSI.dim}↳ ${feat.title}${ANSI.reset}`);
+              }
+            });
+          }
+          console.log(`${ANSI.cyan}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}\n`);
+          console.log(`${ANSI.dim}Use \`dag activate <name>\` to restore an archived feature to active workspace.${ANSI.reset}\n`);
+          break;
+        }
+
+        // Archive the current workspace
+        let archiveName = targetName || subAction || '';
+        let featureBranch = '';
+        try {
+          featureBranch = execSync('git branch --show-current', { encoding: 'utf8', cwd: process.cwd() }).trim();
+        } catch (e) {}
+
+        const pipeState = getPipelineStatus();
+        if (!pipeState.hasRequirements && !pipeState.hasContracts && !pipeState.hasTasks) {
+          logWarning('Current feature workspace is empty. Nothing to archive.');
+          break;
+        }
+
+        if (!archiveName) {
+          let defaultName = 'current-feature';
+          const reqPath = resolveArtifactPath('00-requirements.md');
+          if (fs.existsSync(reqPath)) {
+            try {
+              const reqTxt = fs.readFileSync(reqPath, 'utf8');
+              const tMatch = reqTxt.match(/^#\s*([^\n]+)/m) || reqTxt.match(/Feature:\s*([^\n]+)/i);
+              if (tMatch && tMatch[1]) {
+                defaultName = slugify(tMatch[1].replace(/^(Feature\s*Request|Feature\s*Goal|Requirements|Feature):\s*/i, ''));
+              }
+            } catch (e) {}
+          }
+
+          const userEnteredName = await askQuestion(`👉 Name for archived feature (Default: ${defaultName}): `);
+          archiveName = userEnteredName.trim() || defaultName;
+        }
+
+        const res = archiveFeatureWorkspace('archive', archiveName, {
+          branch: featureBranch,
+          status: pipeState.hasPrDescription ? 'SHIPPED' : (pipeState.hasTasks ? 'PAUSED' : 'DRAFT')
+        }, process.cwd());
+
+        if (res.success) {
+          logSuccess(`Feature workspace archived to: ${path.relative(process.cwd(), res.targetDir)}`);
+          console.log(`\n✨ Active feature workspace reset. Run \`dag new\` or \`dag activate <name>\`!\n`);
+        } else {
+          logError(`Archiving failed: ${res.message}`);
+        }
+        break;
+      }
+
+      case 'activate':
+      case 'restore':
+      case 'switch': {
+        let [targetFeature] = args;
+        const archivedFeatures = listArchivedFeatures(process.cwd());
+        const allFeatures = listAllFeatures(process.cwd());
+
+        const combinedList = [...archivedFeatures, ...allFeatures.filter(f => !f.isCurrent)];
+
+        if (!targetFeature) {
+          if (combinedList.length === 0) {
+            logWarning('No archived or inactive feature workspaces found to activate.');
+            break;
+          }
+
+          console.log(`\n${ANSI.cyan}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+          console.log(`│ 🔄 SELECT FEATURE WORKSPACE TO ACTIVATE                            │`);
+          console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
+          combinedList.forEach((feat, idx) => {
+            const statusBadge = feat.status === 'SHIPPED' 
+              ? `${ANSI.brightGreen}[SHIPPED]${ANSI.reset}` 
+              : (feat.status === 'PAUSED' ? `${ANSI.brightYellow}[PAUSED]${ANSI.reset}` : `${ANSI.cyan}[DRAFT]${ANSI.reset}`);
+            const branchStr = feat.meta?.branch ? `${ANSI.dim}(${feat.meta.branch})${ANSI.reset}` : '';
+            console.log(`  [${idx + 1}] ${ANSI.bold}${feat.name.padEnd(28)}${ANSI.reset} ${statusBadge} ${branchStr}`);
+          });
+          console.log(`${ANSI.cyan}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}\n`);
+
+          const choice = await askQuestion(`👉 Enter feature number or name to activate: `);
+          const num = parseInt(choice.trim(), 10);
+          if (!isNaN(num) && num >= 1 && num <= combinedList.length) {
+            targetFeature = combinedList[num - 1].name;
+          } else {
+            targetFeature = choice.trim();
+          }
+        }
+
+        if (!targetFeature) {
+          logError('No feature specified.');
+          break;
+        }
+
+        logStep(`Activating feature workspace '${targetFeature}'...`, 'Workspace Engine', 'activateFeatureWorkspace');
+        const actRes = activateFeatureWorkspace(targetFeature, process.cwd());
+
+        if (!actRes.success) {
+          logError(actRes.message);
+          break;
+        }
+
+        logSuccess(`Workspace '${targetFeature}' is now active at ${path.relative(process.cwd(), actRes.targetDir)}!`);
+
+        // Check associated git branch
+        const associatedBranch = actRes.meta?.branch;
+        let currentBranch = '';
+        try {
+          currentBranch = execSync('git branch --show-current', { encoding: 'utf8', cwd: process.cwd() }).trim();
+        } catch (e) {}
+
+        if (associatedBranch && currentBranch && associatedBranch !== currentBranch) {
+          console.log(`\n${ANSI.brightYellow}⚠️  Associated Git branch for this feature is '${associatedBranch}', but current branch is '${currentBranch}'.${ANSI.reset}`);
+          const doSwitch = await askQuestion(`👉 Switch to git branch '${associatedBranch}' now? [Y/n] (Default: Y): `);
+          if (!doSwitch.trim() || doSwitch.toLowerCase() === 'y' || doSwitch.toLowerCase() === 'yes') {
+            try {
+              logStep(`Switching branch to '${associatedBranch}'...`, 'Git', 'git checkout');
+              execSync(`git checkout "${associatedBranch}"`, { stdio: 'inherit', cwd: process.cwd() });
+              logSuccess(`Switched to '${associatedBranch}'!`);
+            } catch (gitErr) {
+              logWarning(`Could not switch branch: ${gitErr.message}`);
+            }
+          }
+        }
+
+        // Check for codebase drift since last update
+        const lastUpdated = actRes.meta?.lastUpdated;
+        if (lastUpdated) {
+          const daysAgo = Math.round((Date.now() - new Date(lastUpdated).getTime()) / (1000 * 60 * 60 * 24));
+          if (daysAgo > 1) {
+            console.log(`\n${ANSI.brightYellow}🕒 This feature was last worked on ${daysAgo} day(s) ago (${new Date(lastUpdated).toLocaleDateString()}).${ANSI.reset}`);
+            const doRecon = await askQuestion(`👉 Run recon refresh to check for breaking codebase changes? [y/N] (Default: N): `);
+            if (doRecon.trim().toLowerCase() === 'y' || doRecon.trim().toLowerCase() === 'yes') {
+              await runStep1();
+            }
+          }
+        }
+        break;
+      }
+
+      case 'features':
+      case 'list': {
+        const allFeatures = listAllFeatures(process.cwd());
+        const archivedFeatures = listArchivedFeatures(process.cwd());
+
+        console.log(`\n${ANSI.cyan}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+        console.log(`│ 🌟 ALL FEATURE WORKSPACES (ACTIVE & ARCHIVED)                      │`);
+        console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
+        
+        if (allFeatures.length === 0 && archivedFeatures.length === 0) {
+          console.log(`│  (No feature workspaces found. Run \`dag new\` to start one)       │`);
+        } else {
+          allFeatures.forEach((feat, idx) => {
+            const currentTag = feat.isCurrent ? `${ANSI.brightGreen}* ACTIVE${ANSI.reset} ` : '         ';
+            const statusBadge = feat.status === 'SHIPPED' 
+              ? `${ANSI.brightGreen}[SHIPPED]${ANSI.reset}` 
+              : (feat.status === 'PAUSED' ? `${ANSI.brightYellow}[PAUSED]${ANSI.reset}` : `${ANSI.cyan}[DRAFT]${ANSI.reset}`);
+            console.log(`│ ${currentTag} ${ANSI.bold}${feat.name.padEnd(26)}${ANSI.reset} ${statusBadge}`);
+          });
+
+          if (archivedFeatures.length > 0) {
+            console.log(`├────────────────────────────────────────────────────────────────────┤`);
+            console.log(`│ ${ANSI.dim}📦 Archived Workspaces:${ANSI.reset}${' '.repeat(44)} │`);
+            archivedFeatures.forEach((feat) => {
+              const statusBadge = feat.status === 'SHIPPED' 
+                ? `${ANSI.brightGreen}[SHIPPED]${ANSI.reset}` 
+                : (feat.status === 'PAUSED' ? `${ANSI.brightYellow}[PAUSED]${ANSI.reset}` : `${ANSI.cyan}[DRAFT]${ANSI.reset}`);
+              console.log(`│   ${ANSI.dim}archive/${feat.name.padEnd(24)}${ANSI.reset} ${statusBadge}${' '.repeat(16)} │`);
+            });
+          }
+        }
+        console.log(`${ANSI.cyan}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}\n`);
+        console.log(`${ANSI.dim}Commands: \`dag activate <name>\` to resume | \`dag archive\` to park current${ANSI.reset}\n`);
+        break;
+      }
+
       case 'rollback':
         const targetStep = parseInt(args[0] || '1', 10);
         const { backupDir, backedUp } = createRollbackSnapshot(targetStep);
@@ -2227,9 +2427,9 @@ ${ANSI.cyan}Core Commands:${ANSI.reset}
   dag service [link|list]  Manage linked microservices & harvest SQL/OpenAPI/Postman schemas
   dag verify (or audit)    Run Pre-Flight Verifier quality & policy audit on active specs
   dag stats                View token usage, cost benchmarks, and multi-model net savings
-  dag status               View visual dashboard of pipeline artifacts & active config
-  dag features (or list)   List all feature workspaces and their completion status
-  dag switch <name>        Switch active feature workspace context
+  dag features (or list)   List all active & archived feature workspaces with progress status
+  dag archive [name]       Park current feature workspace into .dag/archive/<name>
+  dag activate [name]      Restore/switch to an archived or saved feature workspace
   dag stack [base-branch]  Fetch base/PR branch and create a clean stacked feature branch
   dag config [preset]      Manage providers, models, and API keys (built-ins & custom presets)
   dag rollback <step>      Safely rewind to a previous stage with automatic backup snapshot
