@@ -20,6 +20,7 @@ import {
   createRollbackSnapshot, 
   cleanArtifacts, 
   archiveFeatureWorkspace,
+  unarchiveFeatureWorkspace,
   activateFeatureWorkspace,
   listArchivedFeatures,
   getFeatureContextMeta,
@@ -1478,30 +1479,45 @@ async function runShip(args = []) {
     logWarning(`GitHub CLI (\`gh\`) not detected. Your complete PR description is saved in \`${path.relative(process.cwd(), prPath)}\`.`);
   }
 
-  // 4. Post-Ship Feature Archive & Workspace Reset
-  const defaultArchiveName = slugify(featureGoal || 'completed-feature');
-  console.log(`\n${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
-  console.log(`│ 📦 POST-SHIP WORKSPACE CLEANUP & ARCHIVING                         │`);
-  console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
-  console.log(`  [1] ${ANSI.bold}${ANSI.cyan}Archive Feature${ANSI.reset} (Move to .dag/archive/${defaultArchiveName} & keep features clean)`);
-  console.log(`  [2] ${ANSI.bold}Rename in Features${ANSI.reset} (Move to specs/${defaultArchiveName})`);
-  console.log(`  [3] ${ANSI.bold}Keep In Place${ANSI.reset} (Leave in current feature workspace)`);
-  console.log(`${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}`);
+  // 4. Post-Ship Feature Promotion to features/<feature-name> (Hot Tier)
+  const defaultFeatureName = slugify(featureGoal || 'completed-feature');
+  logStep(`Promoting shipped feature to features/${defaultFeatureName}...`, 'Workspace Engine', 'archiveFeatureWorkspace');
+  
+  const shipPromoteRes = archiveFeatureWorkspace('named_feature', defaultFeatureName, {
+    branch: currentBranch,
+    baseBranch: baseBranch,
+    status: 'SHIPPED'
+  }, process.cwd());
 
-  const archiveChoice = await askQuestion(`👉 Select cleanup action [1/2/3] (Default: 1): `);
-  const choice = archiveChoice.trim() || '1';
+  if (shipPromoteRes.success) {
+    logSuccess(`Feature promoted to: ${path.relative(process.cwd(), shipPromoteRes.targetDir)}`);
+    console.log(`\n✨ Active feature workspace reset. Ready for your next feature (\`dag new\`)!\n`);
+  }
 
-  if (choice === '1' || choice === '2') {
-    const customName = await askQuestion(`👉 Feature archive name (Press Enter for '${defaultArchiveName}'): `);
-    const finalName = customName.trim() || defaultArchiveName;
-    const destType = choice === '1' ? 'archive' : 'named_feature';
-    
-    const result = archiveFeatureWorkspace(destType, finalName, process.cwd());
-    if (result.success) {
-      logSuccess(`Workspace archived to: ${path.relative(process.cwd(), result.targetDir)}`);
-      console.log(`\n✨ Active feature workspace reset. Ready for your next feature (\`dag new\`)!\n`);
-    } else {
-      logWarning(`Could not archive feature: ${result.message}`);
+  // Check Hot-Tier Capacity Cap (Default: 5)
+  const maxHotFeatures = parseInt(config.MAX_ACTIVE_FEATURES || '5', 10);
+  const activeFeatures = listAllFeatures(process.cwd()).filter(f => !f.isCurrent);
+
+  if (activeFeatures.length > maxHotFeatures) {
+    console.log(`\n${ANSI.brightYellow}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+    console.log(`│ ⚠️  HOT-TIER FEATURE CAPACITY LIMIT REACHED (${activeFeatures.length}/${maxHotFeatures})                │`);
+    console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
+    console.log(`  Features in active folder exceed the clean capacity limit.`);
+    activeFeatures.forEach((feat, idx) => {
+      const stBadge = feat.status === 'SHIPPED' ? `${ANSI.brightGreen}[SHIPPED]${ANSI.reset}` : `${ANSI.brightYellow}[PAUSED]${ANSI.reset}`;
+      console.log(`  [${idx + 1}] ${feat.name.padEnd(28)} ${stBadge}`);
+    });
+    console.log(`  [S] Skip archiving for now`);
+    console.log(`${ANSI.brightYellow}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}`);
+
+    const capChoice = await askQuestion(`👉 Select feature number to archive to cold storage [.dag/archive/]: `);
+    const capNum = parseInt(capChoice.trim(), 10);
+    if (!isNaN(capNum) && capNum >= 1 && capNum <= activeFeatures.length) {
+      const featToArchive = activeFeatures[capNum - 1];
+      const archiveRes = archiveFeatureWorkspace('archive', featToArchive.name, featToArchive.meta || {}, process.cwd());
+      if (archiveRes.success) {
+        logSuccess(`Moved '${featToArchive.name}' to cold storage: ${path.relative(process.cwd(), archiveRes.targetDir)}`);
+      }
     }
   }
 }
@@ -2022,13 +2038,14 @@ async function main() {
         const [subAction, targetName] = args;
         const archivedList = listArchivedFeatures(process.cwd());
 
-        if (subAction === 'list' || (!subAction && args.length === 0 && archivedList.length > 0 && !getPipelineStatus().hasRequirements)) {
-          // Display archived features table
+        // dag archive (with no current feature or explicit 'list') -> list cold storage
+        const pipeState = getPipelineStatus();
+        if (subAction === 'list' || (!subAction && args.length === 0 && !pipeState.hasRequirements && !pipeState.hasContracts)) {
           console.log(`\n${ANSI.cyan}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
-          console.log(`│ 📦 ARCHIVED FEATURE WORKSPACES                                     │`);
+          console.log(`│ 📦 ARCHIVED FEATURES (COLD STORAGE: .dag/archive/)                 │`);
           console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
           if (archivedList.length === 0) {
-            console.log(`│  (No archived features found in .dag/archive/ or dag/archive/)     │`);
+            console.log(`│  (No archived features found in cold storage)                      │`);
           } else {
             archivedList.forEach((feat, idx) => {
               const statusBadge = feat.status === 'SHIPPED' 
@@ -2042,18 +2059,17 @@ async function main() {
             });
           }
           console.log(`${ANSI.cyan}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}\n`);
-          console.log(`${ANSI.dim}Use \`dag activate <name>\` to restore an archived feature to active workspace.${ANSI.reset}\n`);
+          console.log(`${ANSI.dim}Use \`dag unarchive <name>\` to restore an archived feature to the active features folder.${ANSI.reset}\n`);
           break;
         }
 
-        // Archive the current workspace
+        // Archive the current workspace to cold storage
         let archiveName = targetName || subAction || '';
         let featureBranch = '';
         try {
           featureBranch = execSync('git branch --show-current', { encoding: 'utf8', cwd: process.cwd() }).trim();
         } catch (e) {}
 
-        const pipeState = getPipelineStatus();
         if (!pipeState.hasRequirements && !pipeState.hasContracts && !pipeState.hasTasks) {
           logWarning('Current feature workspace is empty. Nothing to archive.');
           break;
@@ -2090,25 +2106,97 @@ async function main() {
         break;
       }
 
-      case 'activate':
-      case 'restore':
-      case 'switch': {
+      case 'unarchive': {
         let [targetFeature] = args;
-        const archivedFeatures = listArchivedFeatures(process.cwd());
-        const allFeatures = listAllFeatures(process.cwd());
-
-        const combinedList = [...archivedFeatures, ...allFeatures.filter(f => !f.isCurrent)];
+        const archivedList = listArchivedFeatures(process.cwd());
 
         if (!targetFeature) {
-          if (combinedList.length === 0) {
-            logWarning('No archived or inactive feature workspaces found to activate.');
+          if (archivedList.length === 0) {
+            logWarning('No archived features found in cold storage to unarchive.');
             break;
           }
 
           console.log(`\n${ANSI.cyan}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
-          console.log(`│ 🔄 SELECT FEATURE WORKSPACE TO ACTIVATE                            │`);
+          console.log(`│ 📦 SELECT FEATURE TO UNARCHIVE (COLD STORAGE ➔ FEATURES)           │`);
           console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
-          combinedList.forEach((feat, idx) => {
+          archivedList.forEach((feat, idx) => {
+            const statusBadge = feat.status === 'SHIPPED' 
+              ? `${ANSI.brightGreen}[SHIPPED]${ANSI.reset}` 
+              : (feat.status === 'PAUSED' ? `${ANSI.brightYellow}[PAUSED]${ANSI.reset}` : `${ANSI.cyan}[DRAFT]${ANSI.reset}`);
+            const branchStr = feat.meta?.branch ? `${ANSI.dim}(${feat.meta.branch})${ANSI.reset}` : '';
+            console.log(`  [${idx + 1}] ${ANSI.bold}${feat.name.padEnd(28)}${ANSI.reset} ${statusBadge} ${branchStr}`);
+          });
+          console.log(`${ANSI.cyan}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}\n`);
+
+          const choice = await askQuestion(`👉 Enter feature number or name to unarchive: `);
+          const num = parseInt(choice.trim(), 10);
+          if (!isNaN(num) && num >= 1 && num <= archivedList.length) {
+            targetFeature = archivedList[num - 1].name;
+          } else {
+            targetFeature = choice.trim();
+          }
+        }
+
+        if (!targetFeature) {
+          logError('No feature specified.');
+          break;
+        }
+
+        // Check hot-tier cap before unarchiving
+        const maxHotFeatures = parseInt(config.MAX_ACTIVE_FEATURES || '5', 10);
+        const hotFeatures = listAllFeatures(process.cwd()).filter(f => !f.isCurrent);
+        if (hotFeatures.length >= maxHotFeatures) {
+          console.log(`\n${ANSI.brightYellow}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+          console.log(`│ ⚠️  HOT-TIER FEATURE CAPACITY LIMIT REACHED (${hotFeatures.length}/${maxHotFeatures})                │`);
+          console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
+          console.log(`  Please archive a feature to cold storage before unarchiving.`);
+          hotFeatures.forEach((feat, idx) => {
+            const stBadge = feat.status === 'SHIPPED' ? `${ANSI.brightGreen}[SHIPPED]${ANSI.reset}` : `${ANSI.brightYellow}[PAUSED]${ANSI.reset}`;
+            console.log(`  [${idx + 1}] ${feat.name.padEnd(28)} ${stBadge}`);
+          });
+          console.log(`  [S] Skip limit check`);
+          console.log(`${ANSI.brightYellow}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}`);
+
+          const capAns = await askQuestion(`👉 Select feature to archive, or [S] to skip: `);
+          const capNum = parseInt(capAns.trim(), 10);
+          if (!isNaN(capNum) && capNum >= 1 && capNum <= hotFeatures.length) {
+            const featToMove = hotFeatures[capNum - 1];
+            archiveFeatureWorkspace('archive', featToMove.name, featToMove.meta || {}, process.cwd());
+            logSuccess(`Archived '${featToMove.name}' to cold storage.`);
+          }
+        }
+
+        logStep(`Unarchiving '${targetFeature}' to features folder...`, 'Workspace Engine', 'unarchiveFeatureWorkspace');
+        const unRes = unarchiveFeatureWorkspace(targetFeature, process.cwd());
+
+        if (!unRes.success) {
+          logError(unRes.message);
+          break;
+        }
+
+        logSuccess(`Feature moved to: ${path.relative(process.cwd(), unRes.targetDir)}`);
+        console.log(`\n👉 Run \`dag activate ${unRes.featureName}\` whenever you want to set it as current-feature!\n`);
+        break;
+      }
+
+      case 'activate':
+      case 'restore':
+      case 'switch': {
+        let [targetFeature] = args;
+        // Strictly target Hot Tier features (inside features/ folder)
+        const hotFeatures = listAllFeatures(process.cwd()).filter(f => !f.isCurrent);
+
+        if (!targetFeature) {
+          if (hotFeatures.length === 0) {
+            logWarning('No stored features found in the features/ folder to activate.');
+            console.log(`${ANSI.dim}To restore from cold storage, run \`dag unarchive\` first.${ANSI.reset}\n`);
+            break;
+          }
+
+          console.log(`\n${ANSI.cyan}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+          console.log(`│ 🔄 SELECT FEATURE TO ACTIVATE (FEATURES ➔ CURRENT-FEATURE)         │`);
+          console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
+          hotFeatures.forEach((feat, idx) => {
             const statusBadge = feat.status === 'SHIPPED' 
               ? `${ANSI.brightGreen}[SHIPPED]${ANSI.reset}` 
               : (feat.status === 'PAUSED' ? `${ANSI.brightYellow}[PAUSED]${ANSI.reset}` : `${ANSI.cyan}[DRAFT]${ANSI.reset}`);
@@ -2119,8 +2207,8 @@ async function main() {
 
           const choice = await askQuestion(`👉 Enter feature number or name to activate: `);
           const num = parseInt(choice.trim(), 10);
-          if (!isNaN(num) && num >= 1 && num <= combinedList.length) {
-            targetFeature = combinedList[num - 1].name;
+          if (!isNaN(num) && num >= 1 && num <= hotFeatures.length) {
+            targetFeature = hotFeatures[num - 1].name;
           } else {
             targetFeature = choice.trim();
           }
@@ -2179,14 +2267,14 @@ async function main() {
 
       case 'features':
       case 'list': {
+        // Strictly Hot-Tier Features in features/ folder
         const allFeatures = listAllFeatures(process.cwd());
-        const archivedFeatures = listArchivedFeatures(process.cwd());
 
         console.log(`\n${ANSI.cyan}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
-        console.log(`│ 🌟 ALL FEATURE WORKSPACES (ACTIVE & ARCHIVED)                      │`);
+        console.log(`│ 🌟 ACTIVE FEATURE WORKSPACES (HOT TIER: features/)                 │`);
         console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
         
-        if (allFeatures.length === 0 && archivedFeatures.length === 0) {
+        if (allFeatures.length === 0) {
           console.log(`│  (No feature workspaces found. Run \`dag new\` to start one)       │`);
         } else {
           allFeatures.forEach((feat, idx) => {
@@ -2194,22 +2282,12 @@ async function main() {
             const statusBadge = feat.status === 'SHIPPED' 
               ? `${ANSI.brightGreen}[SHIPPED]${ANSI.reset}` 
               : (feat.status === 'PAUSED' ? `${ANSI.brightYellow}[PAUSED]${ANSI.reset}` : `${ANSI.cyan}[DRAFT]${ANSI.reset}`);
-            console.log(`│ ${currentTag} ${ANSI.bold}${feat.name.padEnd(26)}${ANSI.reset} ${statusBadge}`);
+            const branchStr = feat.meta?.branch ? `${ANSI.dim}(${feat.meta.branch})${ANSI.reset}` : '';
+            console.log(`│ ${currentTag} ${ANSI.bold}${feat.name.padEnd(26)}${ANSI.reset} ${statusBadge} ${branchStr}`);
           });
-
-          if (archivedFeatures.length > 0) {
-            console.log(`├────────────────────────────────────────────────────────────────────┤`);
-            console.log(`│ ${ANSI.dim}📦 Archived Workspaces:${ANSI.reset}${' '.repeat(44)} │`);
-            archivedFeatures.forEach((feat) => {
-              const statusBadge = feat.status === 'SHIPPED' 
-                ? `${ANSI.brightGreen}[SHIPPED]${ANSI.reset}` 
-                : (feat.status === 'PAUSED' ? `${ANSI.brightYellow}[PAUSED]${ANSI.reset}` : `${ANSI.cyan}[DRAFT]${ANSI.reset}`);
-              console.log(`│   ${ANSI.dim}archive/${feat.name.padEnd(24)}${ANSI.reset} ${statusBadge}${' '.repeat(16)} │`);
-            });
-          }
         }
         console.log(`${ANSI.cyan}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}\n`);
-        console.log(`${ANSI.dim}Commands: \`dag activate <name>\` to resume | \`dag archive\` to park current${ANSI.reset}\n`);
+        console.log(`${ANSI.dim}Commands: \`dag activate <name>\` | \`dag archive\` to park | \`dag archive list\` for cold storage${ANSI.reset}\n`);
         break;
       }
 
@@ -2426,10 +2504,11 @@ ${ANSI.cyan}Core Commands:${ANSI.reset}
   dag doctor               Diagnose environment tools (git, gh, claude, ollama), keys & workspace
   dag service [link|list]  Manage linked microservices & harvest SQL/OpenAPI/Postman schemas
   dag verify (or audit)    Run Pre-Flight Verifier quality & policy audit on active specs
-  dag stats                View token usage, cost benchmarks, and multi-model net savings
-  dag features (or list)   List all active & archived feature workspaces with progress status
-  dag archive [name]       Park current feature workspace into .dag/archive/<name>
-  dag activate [name]      Restore/switch to an archived or saved feature workspace
+  dag features (or list)   List active feature workspaces in features/ (Hot Tier)
+  dag archive [name]       Park current feature workspace into .dag/archive/<name> (Cold Storage)
+  dag archive list         List all archived features in cold storage
+  dag unarchive [name]     Restore a feature from cold storage (.dag/archive/) to features/
+  dag activate [name]      Switch active workspace to a feature in features/ (Hot Tier)
   dag stack [base-branch]  Fetch base/PR branch and create a clean stacked feature branch
   dag config [preset]      Manage providers, models, and API keys (built-ins & custom presets)
   dag rollback <step>      Safely rewind to a previous stage with automatic backup snapshot

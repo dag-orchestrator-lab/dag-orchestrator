@@ -394,32 +394,83 @@ export function archiveFeatureWorkspace(destinationType = 'archive', featureName
   };
 }
 
+export function unarchiveFeatureWorkspace(featureName, cwd = process.cwd()) {
+  const config = loadConfig(cwd);
+  const cleanName = slugify(featureName);
+
+  const archivePaths = [
+    path.join(cwd, '.dag', 'archive', cleanName),
+    path.join(cwd, 'dag', 'archive', cleanName)
+  ];
+
+  const sourceDir = archivePaths.find(p => fs.existsSync(p) && fs.statSync(p).isDirectory());
+
+  if (!sourceDir) {
+    return { success: false, message: `Could not find archived feature '${cleanName}' in .dag/archive/ or dag/archive/.` };
+  }
+
+  const baseSpecsDir = path.join(cwd, config.SPECS_DIR || '.dag/features');
+  const targetDir = path.join(baseSpecsDir, cleanName);
+
+  if (fs.existsSync(targetDir)) {
+    return { success: false, message: `A feature named '${cleanName}' already exists in ${path.relative(cwd, baseSpecsDir)}.` };
+  }
+
+  fs.mkdirSync(path.dirname(targetDir), { recursive: true });
+  fs.renameSync(sourceDir, targetDir);
+
+  const meta = getFeatureContextMeta(targetDir) || {};
+  meta.status = meta.status === 'SHIPPED' ? 'SHIPPED' : 'PAUSED';
+  saveFeatureContextMeta(targetDir, meta);
+
+  return {
+    success: true,
+    previousDir: sourceDir,
+    targetDir,
+    featureName: cleanName,
+    meta
+  };
+}
+
 export function activateFeatureWorkspace(featureName, cwd = process.cwd()) {
   const config = loadConfig(cwd);
   const cleanName = slugify(featureName);
 
-  // Find the feature in archive or features folder
+  // STRICT HOT-TIER SCOPE: Only activate features inside features/ folder
   const candidatePaths = [
-    path.join(cwd, '.dag', 'archive', cleanName),
-    path.join(cwd, 'dag', 'archive', cleanName),
+    path.join(cwd, config.SPECS_DIR || '.dag/features', cleanName),
     path.join(cwd, '.dag', 'features', cleanName),
     path.join(cwd, 'dag', 'features', cleanName),
-    path.join(cwd, config.SPECS_DIR || '.dag/features', cleanName)
+    path.join(cwd, 'docs', 'features', cleanName)
   ];
 
   let sourceDir = candidatePaths.find(p => fs.existsSync(p) && fs.statSync(p).isDirectory());
 
   if (!sourceDir) {
-    return { success: false, message: `Could not find archived or stored feature '${cleanName}'.` };
+    // Check if it's in archive to provide a helpful instruction
+    const inArchive = [
+      path.join(cwd, '.dag', 'archive', cleanName),
+      path.join(cwd, 'dag', 'archive', cleanName)
+    ].some(p => fs.existsSync(p));
+
+    if (inArchive) {
+      return {
+        success: false,
+        message: `'${cleanName}' is currently in the archive (Cold Tier). Run \`dag unarchive ${cleanName}\` first to move it to features, then activate it.`
+      };
+    }
+
+    return { success: false, message: `Could not find feature '${cleanName}' in features folder.` };
   }
 
   const currentDir = getFeatureWorkspaceDir(cwd);
 
-  // Auto-archive current workspace if it has content and is not the same directory
+  // Auto-park current workspace to features/<old-name> or archive before activating new one
   if (currentDir !== sourceDir && fs.existsSync(currentDir)) {
     const currentStatus = getPipelineStatus(cwd);
     if (currentStatus.hasRequirements || currentStatus.hasContracts) {
-      archiveFeatureWorkspace('archive', '', {}, cwd);
+      // Park current feature in hot tier features folder
+      archiveFeatureWorkspace('named_feature', '', {}, cwd);
     }
   }
 
