@@ -135,8 +135,9 @@ ${projectRules.rules}
 `;
 }
 
-export function appendLearnedRule(feedbackText, category = 'General', cwd = process.cwd()) {
-  const rulePath = path.join(cwd, '.dagrules');
+export function appendLearnedRule(feedbackText, category = 'General', isLocal = false, cwd = process.cwd()) {
+  const ruleFileName = isLocal ? '.dagrules.local' : '.dagrules';
+  const rulePath = path.join(cwd, ruleFileName);
   let currentContent = '';
   
   if (fs.existsSync(rulePath)) {
@@ -144,7 +145,7 @@ export function appendLearnedRule(feedbackText, category = 'General', cwd = proc
       currentContent = fs.readFileSync(rulePath, 'utf8').trim();
     } catch (e) {}
   } else {
-    currentContent = '# Team Engineering Policies & Architecture Rules\n';
+    currentContent = isLocal ? '# Local Developer Rules (Gitignored)\n' : '# Team Engineering Policies & Architecture Rules\n';
   }
 
   // Clean and format feedback into a crisp policy bullet

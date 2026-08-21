@@ -646,13 +646,15 @@ async function runStep1() {
         console.log(`  [${cIdx + 1}] ${discoveredConventions[cIdx]}`);
       }
       console.log(`${ANSI.cyan}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}`);
-      const promoteAns = await askQuestion('👉 Promote any convention to permanent .dagrules? [e.g. 1,2 / none] (Default: none): ');
+      const promoteAns = await askQuestion('👉 Promote any convention to rules? [e.g. 1,2 / none] (Default: none): ');
       const pTrimmed = promoteAns.trim();
       if (pTrimmed && pTrimmed.toLowerCase() !== 'none' && pTrimmed.toLowerCase() !== 'n') {
+        const scopeChoice = await askQuestion('   Where to save? [1] Team-wide (.dagrules) [2] Local-only (.dagrules.local) (Default: 1): ');
+        const isLocal = scopeChoice.trim() === '2';
         const selectedIndices = pTrimmed.split(/[\s,]+/).map(n => parseInt(n, 10) - 1).filter(n => !isNaN(n) && n >= 0 && n < discoveredConventions.length);
         for (const sIdx of selectedIndices) {
-          const res = appendLearnedRule(discoveredConventions[sIdx], 'Learned Convention');
-          if (res.updated) logSuccess(`Saved permanent policy: "${discoveredConventions[sIdx]}"`);
+          const res = appendLearnedRule(discoveredConventions[sIdx], 'Learned Convention', isLocal);
+          if (res.updated) logSuccess(`Saved ${isLocal ? 'local' : 'team-wide'} policy: "${discoveredConventions[sIdx]}" in ${res.path}`);
         }
       }
     }
@@ -676,9 +678,11 @@ async function runStep1() {
       const fb = await askQuestion('👉 Enter your feedback / required changes: ');
       currentFeedback = fb.trim();
       if (currentFeedback) {
-        const learn = await askQuestion('👉 Save this feedback as a permanent team policy in .dagrules? [y/N]: ');
+        const learn = await askQuestion('👉 Save this feedback as a permanent policy? [y/N]: ');
         if (learn.toLowerCase() === 'y' || learn.toLowerCase() === 'yes') {
-          const res = appendLearnedRule(currentFeedback, 'Contract Spec');
+          const scopeChoice = await askQuestion('   Where to save? [1] Team-wide (.dagrules) [2] Local-only (.dagrules.local) (Default: 1): ');
+          const isLocal = scopeChoice.trim() === '2';
+          const res = appendLearnedRule(currentFeedback, 'Contract Spec', isLocal);
           if (res.updated) logSuccess(`Learned rule saved to ${res.path}`);
         }
       }
@@ -686,9 +690,11 @@ async function runStep1() {
       // User typed their feedback directly!
       recordGateApproval(1, false);
       currentFeedback = trimmed;
-      const learn = await askQuestion('👉 Save this feedback as a permanent team policy in .dagrules? [y/N]: ');
+      const learn = await askQuestion('👉 Save this feedback as a permanent policy? [y/N]: ');
       if (learn.toLowerCase() === 'y' || learn.toLowerCase() === 'yes') {
-        const res = appendLearnedRule(currentFeedback, 'Contract Spec');
+        const scopeChoice = await askQuestion('   Where to save? [1] Team-wide (.dagrules) [2] Local-only (.dagrules.local) (Default: 1): ');
+        const isLocal = scopeChoice.trim() === '2';
+        const res = appendLearnedRule(currentFeedback, 'Contract Spec', isLocal);
         if (res.updated) logSuccess(`Learned rule saved to ${res.path}`);
       }
     }
