@@ -86,19 +86,22 @@ export function applyRulePreset(presetKeys, cwd = process.cwd()) {
 
 export function loadProjectRules(cwd = process.cwd()) {
   const candidatePaths = [
-    path.join(cwd, 'dag', 'rules', 'team-standards.md'),
-    path.join(cwd, 'dag', 'rules.md'),
-    path.join(cwd, '.dagrules'),
-    path.join(cwd, '.dagrules.local'),
-    path.join(cwd, '.dag', 'rules.md'),
-    path.join(cwd, '.cursorrules'),
-    path.join(os.homedir(), '.dagrules')
+    { path: path.join(cwd, 'dag', 'rules', 'team-standards.md'), label: 'Team Standards (dag/rules)' },
+    { path: path.join(cwd, 'dag', 'rules.md'), label: 'Team Rules (dag/rules.md)' },
+    { path: path.join(cwd, '.dagrules'), label: 'Team Rules (.dagrules)' },
+    { path: path.join(cwd, '.dagrules.local'), label: 'Local Rules (.dagrules.local)' },
+    { path: path.join(cwd, '.dag', 'rules.md'), label: 'Local Rules (.dag/rules.md)' },
+    { path: path.join(cwd, '.cursorrules'), label: 'Cursor Rules (.cursorrules)' },
+    { path: path.join(os.homedir(), '.dagrules'), label: 'Global User Rules (~/.dagrules)' }
   ];
 
-  for (const rulePath of candidatePaths) {
-    if (fs.existsSync(rulePath)) {
+  const foundRules = [];
+  const foundSources = [];
+
+  for (const item of candidatePaths) {
+    if (fs.existsSync(item.path)) {
       try {
-        let content = fs.readFileSync(rulePath, 'utf8').trim();
+        let content = fs.readFileSync(item.path, 'utf8').trim();
         if (!content) continue;
 
         // If file contains [DAG_RULES] section, prioritize that block
@@ -107,18 +110,26 @@ export function loadProjectRules(cwd = process.cwd()) {
           content = dagSectionMatch[1].trim();
         }
 
-        // Clamp to MAX_RULES_BYTES
-        if (Buffer.byteLength(content, 'utf8') > MAX_RULES_BYTES) {
-          content = content.slice(0, MAX_RULES_BYTES) + '\n... [Rules truncated for token efficiency]';
+        // Check if file has substantive rule lines (starts with - or contains rules)
+        const substantive = content.split('\n').filter(l => l.trim().startsWith('- '));
+        if (substantive.length > 0 || content.length > 20) {
+          foundRules.push(content);
+          foundSources.push(item.label);
         }
-
-        return {
-          rules: content,
-          source: path.basename(rulePath),
-          path: rulePath
-        };
       } catch (e) {}
     }
+  }
+
+  if (foundRules.length > 0) {
+    let combined = foundRules.join('\n\n');
+    if (Buffer.byteLength(combined, 'utf8') > MAX_RULES_BYTES) {
+      combined = combined.slice(0, MAX_RULES_BYTES) + '\n... [Rules truncated for token efficiency]';
+    }
+    return {
+      rules: combined,
+      source: foundSources.join(' + '),
+      path: candidatePaths.find(c => fs.existsSync(c.path))?.path
+    };
   }
 
   return { rules: '', source: null, path: null };
