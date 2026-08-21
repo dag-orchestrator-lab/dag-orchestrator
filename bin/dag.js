@@ -1221,8 +1221,26 @@ async function runShip(args = []) {
         logSuccess('Commit created successfully!');
 
         logStep('Pushing branch to origin...', 'Git', 'git push');
-        execSync('git push origin HEAD', { stdio: 'inherit', cwd: process.cwd() });
-        logSuccess('Branch pushed to origin successfully!');
+        try {
+          execSync('git push origin HEAD', { stdio: 'inherit', cwd: process.cwd() });
+          logSuccess('Branch pushed to origin successfully!');
+        } catch (pushErr) {
+          logWarning('Push was rejected because remote branch has new commits.');
+          const doPull = await askQuestion('👉 Pull latest changes with rebase (`git pull --rebase origin HEAD`) and retry push? [Y/n] (Default: Y): ');
+          if (!doPull.trim() || doPull.toLowerCase() === 'y' || doPull.toLowerCase() === 'yes') {
+            try {
+              logStep('Rebasing on remote changes...', 'Git', 'git pull --rebase');
+              execSync('git pull --rebase origin HEAD', { stdio: 'inherit', cwd: process.cwd() });
+              logSuccess('Rebase successful!');
+
+              logStep('Retrying branch push...', 'Git', 'git push');
+              execSync('git push origin HEAD', { stdio: 'inherit', cwd: process.cwd() });
+              logSuccess('Branch pushed to origin successfully!');
+            } catch (rebaseErr) {
+              logError(`Rebase/push conflict: ${rebaseErr.message}. Please resolve conflicts manually in git.`);
+            }
+          }
+        }
       } catch (commitErr) {
         logWarning(`Git commit/push encountered a notice: ${commitErr.message}`);
       }
