@@ -1382,11 +1382,22 @@ async function runShip(args = []) {
       const userPrTitle = await askQuestion(`👉 Enter Pull Request Title (Press Enter to accept suggestion): `);
       const prTitle = userPrTitle.trim() || defaultPrTitle;
 
+      let currentBranch = '';
+      try {
+        currentBranch = execSync('git branch --show-current', { encoding: 'utf8', cwd: process.cwd() }).trim();
+      } catch (e) {}
+
       try {
         logStep('Creating GitHub Pull Request...', 'GitHub CLI', 'gh pr create');
-        const prOutput = execSync(`gh pr create --title "${prTitle.replace(/"/g, '\\"')}" --body-file "${prPath}"`, {
-          encoding: 'utf8'
-        });
+        
+        // Ensure the current branch is pushed to remote with tracking before calling gh pr create
+        try {
+          execSync('git push -u origin HEAD', { stdio: 'ignore', cwd: process.cwd() });
+        } catch (e) {}
+
+        const headFlag = currentBranch ? `--head "${currentBranch}"` : '';
+        const prCmd = `gh pr create --title "${prTitle.replace(/"/g, '\\"')}" --body-file "${prPath}" ${headFlag}`.trim();
+        const prOutput = execSync(prCmd, { encoding: 'utf8', cwd: process.cwd() });
         logSuccess(`Pull Request Created:\n${prOutput}`);
       } catch (err) {
         logWarning(`Could not auto-create PR via gh: ${err.message}. You can manually paste ${path.relative(process.cwd(), prPath)} into your PR.`);
