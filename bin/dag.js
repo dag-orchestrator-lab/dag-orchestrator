@@ -852,6 +852,11 @@ async function runStep3() {
     throw new Error('05-tasks.md or 02-contracts.md missing.');
   }
 
+  const tasksText = fs.readFileSync(tasksPath, 'utf8');
+  const contractText = fs.readFileSync(contractPath, 'utf8');
+  const projectRules = loadProjectRules();
+  const rulesPrompt = formatRulesForPrompt(projectRules);
+
   // 1. Isolate the single next uncompleted task (Strict Task Slicing)
   const taskBlocks = tasksText.split(/(?=###\s+(?:\[[ x]\]\s*)?T-\d+)/gi);
   let activeTaskBlock = '';
