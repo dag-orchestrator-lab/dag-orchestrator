@@ -852,16 +852,37 @@ async function runStep3() {
     throw new Error('05-tasks.md or 02-contracts.md missing.');
   }
 
-  const tasksText = fs.readFileSync(tasksPath, 'utf8');
-  const contractText = fs.readFileSync(contractPath, 'utf8');
-  const projectRules = loadProjectRules();
-  const rulesPrompt = formatRulesForPrompt(projectRules);
+  // 1. Isolate the single next uncompleted task (Strict Task Slicing)
+  const taskBlocks = tasksText.split(/(?=###\s+(?:\[[ x]\]\s*)?T-\d+)/gi);
+  let activeTaskBlock = '';
+  let activeTaskId = '';
+  let activeTaskIndex = -1;
+
+  for (let i = 0; i < taskBlocks.length; i++) {
+    const block = taskBlocks[i];
+    const match = block.match(/###\s+(?:\[([ x])\]\s*)?(T-\d+)/i);
+    if (match) {
+      const isDone = match[1] === 'x';
+      if (!isDone) {
+        activeTaskBlock = block.trim();
+        activeTaskId = match[2].toUpperCase();
+        activeTaskIndex = i;
+        break;
+      }
+    }
+  }
+
+  if (!activeTaskBlock) {
+    logSuccess('All tasks in 05-tasks.md are already marked as completed!');
+    console.log(`\n👉 Run \`dag next\` or \`dag review\` to proceed to Step 4 (Impact Review)!\n`);
+    return;
+  }
 
   const codingProvider = getProviderForStage('coding');
-  logStep('Implementing next unblocked task', codingProvider.name, codingProvider.model);
+  logStep(`Implementing atomic task [${activeTaskId}]`, codingProvider.name, codingProvider.model);
   
   let implResult = await executeStagePrompt('coding', '', '', {
-    taskText: tasksText + (rulesPrompt ? `\n\n${rulesPrompt}` : ''),
+    taskText: `### ACTIVE TASK TO IMPLEMENT (${activeTaskId}):\n${activeTaskBlock}` + (rulesPrompt ? `\n\n${rulesPrompt}` : ''),
     contractText,
     cwd: process.cwd()
   });
@@ -952,6 +973,18 @@ async function runStep3() {
         }
 
         isPassing = true;
+
+        // Auto-mark the task as completed [x] in 05-tasks.md
+        if (activeTaskId && activeTaskIndex !== -1) {
+          const updatedBlock = activeTaskBlock.replace(
+            /###\s+(?:\[[ x]\]\s*)?(T-\d+)/i,
+            '### [x] $1'
+          );
+          taskBlocks[activeTaskIndex] = updatedBlock;
+          const updatedTasksText = taskBlocks.join('');
+          fs.writeFileSync(tasksPath, updatedTasksText);
+          logSuccess(`Marked ${activeTaskId} as completed [x] in 05-tasks.md!`);
+        }
         break;
       } catch (err) {
         const failureTrace = (err.stdout || '') + '\n' + (err.stderr || '') + '\n' + err.message;
