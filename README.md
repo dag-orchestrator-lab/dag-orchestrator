@@ -142,7 +142,7 @@ Add a `.dagrules` file in your repository root to enforce team-specific standard
 
 The DAG Orchestrator roadmap is designed around increasing IDE integration, multi-package monorepo intelligence, and enterprise-grade CI/CD automation:
 
-### 🟢 `v0.1.0-alpha` (Current Release — Incubation & Dogfooding)
+### 🟢 `v0.1.0-alpha` (Completed — Incubation & Dogfooding)
 - [x] Deterministic 5-stage contract-first state machine.
 - [x] Asymmetric multi-model routing & benchmark cost engine (`dag stats`).
 - [x] Pre-Flight Gate Verifier & adaptive `.dagrules` policy learning loop.
@@ -150,26 +150,26 @@ The DAG Orchestrator roadmap is designed around increasing IDE integration, mult
 - [x] Frontend / UI-UX Engine: Figma AST, HTML Wireframe & Website Inspiration Harvester.
 - [x] Multi-feature isolated workspaces & branch stacking (`dag stack`).
 
-### 🟡 `v0.2.0-beta` (IDE Integration & Strict Type Safety)
-- [ ] **TypeScript Porting:** Migrate codebase to 100% strict TypeScript with bundled type definitions (`.d.ts`).
-- [ ] **VS Code & Cursor Extension:** Visual sidebar showing real-time DAG state, gate approval buttons, and diff inspector directly in the editor.
-- [ ] **Antigravity IDE Plugin & Custom Agent Tooling:** First-class slash command and sidecar agent support for Google Antigravity.
-- [ ] **Interactive Terminal UI (TUI):** Rich interactive dashboards powered by Ink/React CLI.
+### 🟡 `v0.2.0-beta` (Current Release — Production Hardening & Git Symmetry)
+- [x] **Symmetrical Directory Architecture:** Exact 1-to-1 mirror layout between `dag/` (committed living documentation) and `.dag/` (100% gitignored private developer sandbox).
+- [x] **Rule Sync & Port Engine:** Bi-directional merging (`dag rules sync`) and source-clearing transfers (`dag rules port`).
+- [x] **Custom PR Templates & Conventions:** Native template inheritance with DAG contract & audit placeholder substitution.
+- [x] **Smart Rebase & Interactive Ship Flow:** Auto-suggests conventional commit titles and handles non-fast-forward git rebase recovery automatically.
+- [ ] **TypeScript Porting:** Complete strict TypeScript migration with full type definitions (`.d.ts`).
 
-### 🟣 `v0.3.0` (Design Mode & Enterprise Multi-Package Routing)
-- [ ] **`dag design` (Double-Diamond Architecture Mode):** Divergent exploration engine generating 3 candidate architectural options, trade-off matrices, and formal `RFC.md` specs before entering the build pipeline.
-- [ ] **Automatic Vertical Feature Slicing (Epics $\to$ Mini-DAGs):** Deconstructs large epics into milestone slices (max 5–8 tasks per slice), executing sequential mini-DAGs with isolated contract scopes and JIT dependency handoffs.
-- [ ] **Smart Complexity Nudge:** Detects massive prompts in `dag code` (>10 estimated tasks) and prompts to run `dag design` first to establish clean vertical slices.
-- [ ] **Gate 3 (Human Acceptance & Live Verification Gate):** Pauses upon test completion for real human testing against live databases/servers, supporting incremental contract addendums (`02-contracts.addendum.md`) without invalidating baseline frozen contracts.
-- [ ] **Configurable Lifecycle Orchestrator (`dag run` vs `dag code`):**
-  - `dag code <feature>`: Fast-path execution for concrete, well-defined requirements.
-  - `dag design <vision>`: Exploratory mode for fuzzy architectural decisions.
-  - `dag run <ask>`: Configurable master orchestrator (`DEFAULT_ENTRY_POINT=code|design`) bridging discovery to code.
-- [ ] **Monorepo & Workspace Routing:** Native Turborepo, Nx, and Cargo workspace dependency graph traversal.
-- [ ] **Semantic Diff & Breaking Change Analyzer:** AST-based schema comparison flagging breaking database/API modifications before PR opening.
-- [ ] **Custom Provider Plugin SDK:** Standardized interface for registering proprietary on-prem models and custom vector stores.
+### 🟣 `v0.3.0` (Double-Diamond Design Mode & Vertical Feature Slicing)
+- [ ] **`dag design` (Exploratory Problem Harness):** Divergent exploration engine generating user persona journeys (`00-personas.md`), candidate architectural trade-offs (`00-tradeoffs.md`), and locked problem statements before code execution.
+- [ ] **Gate 0 (The Design Gate):** Human approval of the problem framing and architectural direction before entering technical recon.
+- [ ] **Automatic Vertical Feature Slicing (Epics $\to$ Mini-DAGs):** Deconstructs massive PRDs into milestone slices (max 4–6 tasks each), executing sequential mini-DAGs with isolated contract scopes and JIT dependency handoffs.
+- [ ] **Gate 3 (Human Acceptance & Live Verification Gate):** Pauses upon test completion for real human testing against live databases/servers, supporting incremental contract addendums (`02-contracts.addendum.md`) without breaking baseline frozen contracts.
+
+### ⚡ `v0.4.0` (Specialized Runtime Harnesses & Fast TDD Sandbox)
+- [ ] **Step 4 Isolated TDD Execution Sandbox:** Micro-loop runner with persistent in-memory test watching (Jest/Vitest/Pytest), sub-150ms execution, and auto-revert on uncompilable syntax/regressions.
+- [ ] **Heterogeneous Stage Compute:** Tailored agent sandboxes and model assignments per pipeline phase (e.g. Gemini 1M+ for Recon, Claude for Contracts, Qwen/DeepSeek for TDD builds).
 
 ### 🔵 `v1.0.0` (Enterprise GA & CI/CD Gatekeeper)
+- [ ] **Step 1 Deep Recon LSP Harness:** AST symbol graph analysis and whole-repo cross-reference indexing without context pollution.
+- [ ] **Step 3 Adversarial Red-Team Fuzzing:** Mutation testing simulator generating property-based edge cases against active contracts.
 - [ ] **Headless CI/CD GitHub Action:** Enforce contract compliance and run pre-flight gate verifiers on incoming Pull Requests automatically.
 - [ ] **Team Policy Cloud Sync:** Centralized synchronization of enterprise `.dagrules` across distributed engineering teams.
 
