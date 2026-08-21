@@ -1269,6 +1269,7 @@ async function runShip(args = []) {
     path.join(process.cwd(), 'pull_request_template.md'),
     path.join(process.cwd(), 'PULL_REQUEST_TEMPLATE.md'),
     path.join(process.cwd(), 'dag', 'templates', 'pr.md'),
+    path.join(process.cwd(), '.dag', 'templates', 'pr.md'),
     path.join(process.cwd(), '.dag', 'pr_template.md')
   ];
 
