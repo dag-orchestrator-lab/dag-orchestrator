@@ -1248,13 +1248,22 @@ async function runShip(args = []) {
   }
 
   // 2. Generate PR Description Bundle
-  const reqContent = fs.existsSync('00-requirements.md') ? fs.readFileSync('00-requirements.md', 'utf8') : '';
-  const contractContent = fs.existsSync('02-contracts.md') ? fs.readFileSync('02-contracts.md', 'utf8') : '';
-  const findingsContent = fs.existsSync('04-findings.md') ? fs.readFileSync('04-findings.md', 'utf8') : '';
-  const tasksContent = fs.existsSync('05-tasks.md') ? fs.readFileSync('05-tasks.md', 'utf8') : '';
+  const reqPath = resolveArtifactPath('00-requirements.md');
+  const contractPath = resolveArtifactPath('02-contracts.md');
+  const addendumPath = resolveArtifactPath('02-contracts.addendum.md');
+  const findingsPath = resolveArtifactPath('04-findings.md');
+  const tasksPath = resolveArtifactPath('05-tasks.md');
+  const reviewPath = resolveArtifactPath('REVIEW.md');
+
+  const reqContent = fs.existsSync(reqPath) ? fs.readFileSync(reqPath, 'utf8') : '';
+  const contractContent = fs.existsSync(contractPath) ? fs.readFileSync(contractPath, 'utf8') : '';
+  const addendumContent = fs.existsSync(addendumPath) ? fs.readFileSync(addendumPath, 'utf8') : '';
+  const findingsContent = fs.existsSync(findingsPath) ? fs.readFileSync(findingsPath, 'utf8') : '';
+  const tasksContent = fs.existsSync(tasksPath) ? fs.readFileSync(tasksPath, 'utf8') : '';
+  const reviewContent = fs.existsSync(reviewPath) ? fs.readFileSync(reviewPath, 'utf8') : '';
 
   const prBody = `## 🚀 Feature Summary
-${reqContent.slice(0, 1000)}
+${reqContent.slice(0, 1500)}
 
 ---
 
@@ -1263,18 +1272,25 @@ ${reqContent.slice(0, 1000)}
 <summary>Click to view Contract Specification</summary>
 
 ${contractContent}
+${addendumContent ? `\n### 📝 Live Testing Addendum\n${addendumContent}` : ''}
 
 </details>
 
 ---
 
 ## 🧐 Adversarial Skeptic Audit (04-findings.md)
+<details>
+<summary>Click to view Skeptic Audit</summary>
+
 ${findingsContent}
+
+</details>
 
 ---
 
-## ✅ Implementation Checklist
+## ✅ Implementation Checklist (05-tasks.md)
 ${tasksContent}
+${reviewContent ? `\n---\n\n## 📝 Whole-Repo Review & Impact Analysis\n<details>\n<summary>Click to view Review Report</summary>\n\n${reviewContent}\n\n</details>` : ''}
 `;
 
   const featureDir = getFeatureWorkspaceDir();
