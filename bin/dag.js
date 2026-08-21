@@ -841,8 +841,7 @@ async function runStep3() {
     console.log(`\n${ANSI.brightYellow}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
     console.log(`│ 💡 AI ASKING FOR DIRECTION, CLARIFICATION, OR CONFIRMATION         │`);
     console.log(`└────────────────────────────────────────────────────────────────────┘${ANSI.reset}`);
-    console.log(`👉 Provide your answer / direction (or press Enter to auto-proceed, or "skip" to opt-out): `);
-    const userDecision = await askQuestion('');
+    const userDecision = await askMultiLine('👉 Enter or paste your direction / additions (Press Enter on empty line or type EOF to submit, or press Enter immediately to auto-proceed):');
     const trimmedDecision = userDecision.trim();
 
     if (!trimmedDecision || trimmedDecision.toLowerCase() === 'skip' || trimmedDecision.toLowerCase() === 'proceed') {
