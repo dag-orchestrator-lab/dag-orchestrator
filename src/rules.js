@@ -187,3 +187,57 @@ export function extractConventionsFromRecon(reconText = '') {
   // Return up to 4 top unique conventions
   return Array.from(new Set(rawLines)).slice(0, 4);
 }
+
+/**
+ * Syncs or Ports rules between Local (.dagrules.local) and Team (.dagrules / dag/rules/team-standards.md)
+ * Mode: 'local-to-team' | 'team-to-local' | 'bidirectional'
+ */
+export function syncRules(mode = 'bidirectional', cwd = process.cwd()) {
+  const teamPath = fs.existsSync(path.join(cwd, 'dag', 'rules', 'team-standards.md'))
+    ? path.join(cwd, 'dag', 'rules', 'team-standards.md')
+    : path.join(cwd, '.dagrules');
+  const localPath = path.join(cwd, '.dagrules.local');
+
+  const teamContent = fs.existsSync(teamPath) ? fs.readFileSync(teamPath, 'utf8').trim() : '';
+  const localContent = fs.existsSync(localPath) ? fs.readFileSync(localPath, 'utf8').trim() : '';
+
+  const parseBullets = text => text.split('\n').filter(l => l.trim().startsWith('- '));
+
+  const teamBullets = parseBullets(teamContent);
+  const localBullets = parseBullets(localContent);
+
+  let mergedTeam = [...teamBullets];
+  let mergedLocal = [...localBullets];
+
+  if (mode === 'local-to-team') {
+    for (const b of localBullets) {
+      if (!mergedTeam.includes(b)) mergedTeam.push(b);
+    }
+  } else if (mode === 'team-to-local') {
+    for (const b of teamBullets) {
+      if (!mergedLocal.includes(b)) mergedLocal.push(b);
+    }
+  } else if (mode === 'bidirectional') {
+    const all = Array.from(new Set([...teamBullets, ...localBullets]));
+    mergedTeam = [...all];
+    mergedLocal = [...all];
+  }
+
+  if (mode === 'local-to-team' || mode === 'bidirectional') {
+    const teamHeader = teamContent.startsWith('#') ? teamContent.split('\n')[0] : '# Team Engineering Policies & Architecture Rules';
+    fs.writeFileSync(teamPath, `${teamHeader}\n${mergedTeam.join('\n')}\n`, 'utf8');
+  }
+
+  if (mode === 'team-to-local' || mode === 'bidirectional') {
+    const localHeader = localContent.startsWith('#') ? localContent.split('\n')[0] : '# Local Developer Rules (Gitignored)';
+    fs.writeFileSync(localPath, `${localHeader}\n${mergedLocal.join('\n')}\n`, 'utf8');
+  }
+
+  return {
+    mode,
+    teamPath: path.basename(teamPath),
+    localPath: path.basename(localPath),
+    teamCount: mergedTeam.length,
+    localCount: mergedLocal.length
+  };
+}

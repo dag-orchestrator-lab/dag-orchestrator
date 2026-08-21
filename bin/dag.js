@@ -26,7 +26,7 @@ import {
   slugify 
 } from '../src/state.js';
 import { recordStageMetrics, getFeatureBenchmark } from '../src/metrics.js';
-import { loadProjectRules, formatRulesForPrompt, appendLearnedRule, extractConventionsFromRecon, RULE_PRESETS, applyRulePreset } from '../src/rules.js';
+import { loadProjectRules, formatRulesForPrompt, appendLearnedRule, extractConventionsFromRecon, RULE_PRESETS, applyRulePreset, syncRules } from '../src/rules.js';
 import { verifyContractSpec, verifyTaskList, renderVerificationReport, verifyFullPipeline } from '../src/verifier.js';
 import { linkService, unlinkService, harvestAllLinkedServices, renderServicesList } from '../src/services.js';
 import { isFrontendTask, processUIDesignReference, formatUIContractSection } from '../src/ui-design.js';
@@ -1358,6 +1358,35 @@ async function main() {
               logError(err.message);
             }
           }
+        } else if (rulesSubCmd === 'sync' || rulesSubCmd === 'port') {
+          banner('SYNC & PORT ENGINEERING RULES');
+          const direction = args[1] ? args[1].toLowerCase() : '';
+          
+          let mode = 'bidirectional';
+          if (direction === 'to-team' || direction === 'local-to-team' || direction === 'export') {
+            mode = 'local-to-team';
+          } else if (direction === 'to-local' || direction === 'team-to-local' || direction === 'import') {
+            mode = 'team-to-local';
+          } else if (!direction) {
+            console.log(`👉 Select Rule Sync / Porting Mode:`);
+            console.log(`   ${ANSI.bold}[1] Bidirectional Sync${ANSI.reset}  → Merge .dagrules.local <-> .dagrules (Default)`);
+            console.log(`   ${ANSI.bold}[2] Port Local to Team${ANSI.reset}  → Export .dagrules.local -> .dagrules (Committed)`);
+            console.log(`   ${ANSI.bold}[3] Port Team to Local${ANSI.reset}  → Import .dagrules -> .dagrules.local (Private)`);
+            const sChoice = await askQuestion('\nSelection [1/2/3] (Default: 1): ');
+            const sTrim = sChoice.trim();
+            if (sTrim === '2') mode = 'local-to-team';
+            else if (sTrim === '3') mode = 'team-to-local';
+            else mode = 'bidirectional';
+          }
+
+          const res = syncRules(mode);
+          if (mode === 'bidirectional') {
+            logSuccess(`Synchronized rules bidirectionally! (${res.teamCount} rules in team, ${res.localCount} rules in local)`);
+          } else if (mode === 'local-to-team') {
+            logSuccess(`Ported rules from Local (.dagrules.local) to Team (.dagrules)! (Total: ${res.teamCount} rules)`);
+          } else if (mode === 'team-to-local') {
+            logSuccess(`Ported rules from Team (.dagrules) to Local (.dagrules.local)! (Total: ${res.localCount} rules)`);
+          }
         } else {
           console.log(`\n${ANSI.cyan}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
           console.log(`│ 📜 ACTIVE TEAM & ARCHITECTURE RULES (.dagrules)                    │`);
@@ -1370,6 +1399,9 @@ async function main() {
           }
           console.log(`${ANSI.cyan}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}`);
           console.log(`Usage:`);
+          console.log(`  dag rules sync                   Interactive sync between local and team rules`);
+          console.log(`  dag rules sync to-team           Port local rules (.dagrules.local) -> team rules (.dagrules)`);
+          console.log(`  dag rules sync to-local          Port team rules (.dagrules) -> local rules (.dagrules.local)`);
           console.log(`  dag rules harvest                Scan whole codebase & auto-generate .dagrules`);
           console.log(`  dag rules preset <name>          Apply standard rule preset (typescript | microservices | frontend | python)\n`);
         }
