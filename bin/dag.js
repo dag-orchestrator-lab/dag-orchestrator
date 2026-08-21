@@ -1166,7 +1166,42 @@ async function runShip(args = []) {
     return;
   }
 
-  const prTitle = args.join(' ') || await askQuestion('👉 Enter Pull Request Title: ');
+  // 1. First Check for unstaged / uncommitted changes
+  let gitStatus = '';
+  try {
+    gitStatus = execSync('git status --short', { encoding: 'utf8', cwd: process.cwd() }).trim();
+  } catch (e) {}
+
+  let commitTitle = args.join(' ');
+
+  if (gitStatus) {
+    console.log(`\n${ANSI.brightYellow}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+    console.log(`│ 📝 UNCOMMITTED CHANGES DETECTED IN WORKING TREE                     │`);
+    console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
+    console.log(gitStatus.split('\n').map(l => `  ${l}`).slice(0, 15).join('\n'));
+    console.log(`${ANSI.brightYellow}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}`);
+
+    const doCommit = await askQuestion('👉 Stage all modified feature files, commit, and push branch now? [Y/n] (Default: Y): ');
+    if (!doCommit.trim() || doCommit.toLowerCase() === 'y' || doCommit.toLowerCase() === 'yes') {
+      if (!commitTitle) {
+        commitTitle = await askQuestion('👉 Enter commit message (e.g. feat: implement campaign dropdown): ');
+      }
+      try {
+        logStep('Staging and committing feature files...', 'Git', 'git commit');
+        execSync('git add -A', { stdio: 'inherit', cwd: process.cwd() });
+        execSync(`git commit -m "${(commitTitle || 'feat: update feature via DAG Orchestrator').replace(/"/g, '\\"')}"`, { stdio: 'inherit', cwd: process.cwd() });
+        logSuccess('Commit created successfully!');
+
+        logStep('Pushing branch to origin...', 'Git', 'git push');
+        execSync('git push origin HEAD', { stdio: 'inherit', cwd: process.cwd() });
+        logSuccess('Branch pushed to origin successfully!');
+      } catch (commitErr) {
+        logWarning(`Git commit/push encountered a notice: ${commitErr.message}`);
+      }
+    }
+  }
+
+  // 2. Generate PR Description Bundle
   const reqContent = fs.existsSync('00-requirements.md') ? fs.readFileSync('00-requirements.md', 'utf8') : '';
   const contractContent = fs.existsSync('02-contracts.md') ? fs.readFileSync('02-contracts.md', 'utf8') : '';
   const findingsContent = fs.existsSync('04-findings.md') ? fs.readFileSync('04-findings.md', 'utf8') : '';
@@ -1199,37 +1234,7 @@ ${tasksContent}
   fs.writeFileSync('PR_DESCRIPTION.md', prBody);
   logSuccess('Generated PR_DESCRIPTION.md');
 
-  // Check for unstaged / uncommitted changes
-  let gitStatus = '';
-  try {
-    gitStatus = execSync('git status --short', { encoding: 'utf8', cwd: process.cwd() }).trim();
-  } catch (e) {}
-
-  if (gitStatus) {
-    console.log(`\n${ANSI.brightYellow}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
-    console.log(`│ 📝 UNCOMMITTED CHANGES DETECTED IN WORKING TREE                     │`);
-    console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
-    console.log(gitStatus.split('\n').map(l => `  ${l}`).slice(0, 15).join('\n'));
-    console.log(`${ANSI.brightYellow}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}`);
-
-    const doCommit = await askQuestion('👉 Stage all modified feature files, commit, and push branch now? [Y/n] (Default: Y): ');
-    if (!doCommit.trim() || doCommit.toLowerCase() === 'y' || doCommit.toLowerCase() === 'yes') {
-      try {
-        logStep('Staging and committing feature files...', 'Git', 'git commit');
-        execSync('git add -A', { stdio: 'inherit', cwd: process.cwd() });
-        execSync(`git commit -m "${prTitle.replace(/"/g, '\\"')}"`, { stdio: 'inherit', cwd: process.cwd() });
-        logSuccess('Commit created successfully!');
-
-        logStep('Pushing branch to origin...', 'Git', 'git push');
-        execSync('git push origin HEAD', { stdio: 'inherit', cwd: process.cwd() });
-        logSuccess('Branch pushed to origin successfully!');
-      } catch (commitErr) {
-        logWarning(`Git commit/push encountered a notice: ${commitErr.message}`);
-      }
-    }
-  }
-
-  // Check if gh CLI is available
+  // 3. Ask whether to open PR via GitHub CLI
   let ghInstalled = false;
   try {
     execSync('which gh', { stdio: 'ignore' });
@@ -1237,8 +1242,9 @@ ${tasksContent}
   } catch (e) {}
 
   if (ghInstalled) {
-    const createPR = await askQuestion('👉 Open Pull Request via GitHub CLI (`gh pr create`)? [Y/n]: ');
+    const createPR = await askQuestion('\n👉 Open Pull Request on GitHub now (`gh pr create`)? [Y/n] (Default: Y): ');
     if (!createPR.trim() || createPR.toLowerCase() === 'y' || createPR.toLowerCase() === 'yes') {
+      const prTitle = commitTitle || args.join(' ') || await askQuestion('👉 Enter Pull Request Title: ');
       try {
         logStep('Creating GitHub Pull Request...', 'GitHub CLI', 'gh pr create');
         const prOutput = execSync(`gh pr create --title "${prTitle.replace(/"/g, '\\"')}" --body-file PR_DESCRIPTION.md`, {
@@ -1248,6 +1254,8 @@ ${tasksContent}
       } catch (err) {
         logWarning(`Could not auto-create PR via gh: ${err.message}. You can manually paste PR_DESCRIPTION.md into your PR.`);
       }
+    } else {
+      console.log(`\n${ANSI.cyan}ℹ️  PR creation skipped. All changes are committed/pushed and documentation saved in PR_DESCRIPTION.md.${ANSI.reset}\n`);
     }
   } else {
     logWarning('GitHub CLI (`gh`) not detected. Your complete PR description is saved in `PR_DESCRIPTION.md`.');
