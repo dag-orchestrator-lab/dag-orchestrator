@@ -229,3 +229,50 @@ export function cleanArtifacts(cwd = process.cwd()) {
 
   return { backupDir, removed };
 }
+
+export function archiveFeatureWorkspace(destinationType = 'archive', featureName = '', cwd = process.cwd()) {
+  const config = loadConfig(cwd);
+  const currentDir = getFeatureWorkspaceDir(cwd);
+
+  if (!fs.existsSync(currentDir)) {
+    return { success: false, message: 'No active feature workspace found to archive.' };
+  }
+
+  const baseSpecsDir = path.join(cwd, config.SPECS_DIR || '.dag/features');
+  let targetDir = '';
+
+  const cleanName = slugify(featureName) || `feature-${Date.now()}`;
+
+  if (destinationType === 'archive') {
+    // Move to .dag/archive/<feature-name> or dag/archive/<feature-name>
+    const archiveBase = config.SPECS_DIR?.startsWith('.dag') 
+      ? path.join(cwd, '.dag', 'archive')
+      : path.join(cwd, 'dag', 'archive');
+    targetDir = path.join(archiveBase, cleanName);
+  } else {
+    // Rename/move inside the features folder: [SPECS_DIR]/<clean-feature-name>
+    targetDir = path.join(baseSpecsDir, cleanName);
+  }
+
+  if (currentDir === targetDir) {
+    return { success: true, targetDir, message: 'Feature workspace is already in the target directory.' };
+  }
+
+  // Ensure target parent directory exists
+  fs.mkdirSync(path.dirname(targetDir), { recursive: true });
+
+  // Move the entire folder
+  fs.renameSync(currentDir, targetDir);
+
+  // Clear ACTIVE_FEATURE in config if it was set
+  if (config.ACTIVE_FEATURE) {
+    saveLocalConfig({ ACTIVE_FEATURE: null, ACTIVE_BRANCH: null, STACKED_BASE_BRANCH: null }, cwd);
+  }
+
+  return {
+    success: true,
+    previousDir: currentDir,
+    targetDir,
+    featureName: cleanName
+  };
+}

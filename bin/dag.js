@@ -19,6 +19,7 @@ import {
   getPipelineStatus, 
   createRollbackSnapshot, 
   cleanArtifacts, 
+  archiveFeatureWorkspace,
   recordGateApproval, 
   resolveArtifactPath, 
   getFeatureWorkspaceDir, 
@@ -1375,6 +1376,19 @@ async function runShip(args = []) {
   fs.writeFileSync(prPath, prBody);
   logSuccess(`Generated ${path.relative(process.cwd(), prPath)}`);
 
+  // Extract feature title for PR & Archiving
+  let featureGoal = 'Dynamic Campaign Live Dashboard';
+  if (fs.existsSync(reqPath)) {
+    const reqText = fs.readFileSync(reqPath, 'utf8');
+    const titleMatch = reqText.match(/^#\s*([^\n]+)/m) || reqText.match(/Feature:\s*([^\n]+)/i);
+    if (titleMatch && titleMatch[1]) {
+      featureGoal = titleMatch[1]
+        .replace(/^(Feature\s*Request|Feature\s*Goal|Requirements|Feature):\s*/i, '')
+        .replace(/^(feat|fix|chore):\s*/i, '')
+        .trim();
+    }
+  }
+
   // 3. Ask whether to open PR via GitHub CLI
   let ghInstalled = false;
   try {
@@ -1394,19 +1408,6 @@ async function runShip(args = []) {
       const ticketMatch = branchName.match(/(?:feat|fix|chore|hotfix)\/([A-Z]+-\d+)/i) || branchName.match(/([A-Z]+-\d+)/i);
       const prefix = branchName.startsWith('fix') ? 'fix' : (branchName.startsWith('chore') ? 'chore' : (branchName.startsWith('hotfix') ? 'hotfix' : 'feat'));
       const ticket = ticketMatch ? ticketMatch[1].toUpperCase() : 'DC-XXX';
-      
-      let featureGoal = 'Dynamic Campaign Live Dashboard';
-      const reqPath = resolveArtifactPath('00-requirements.md');
-      if (fs.existsSync(reqPath)) {
-        const reqText = fs.readFileSync(reqPath, 'utf8');
-        const titleMatch = reqText.match(/^#\s*([^\n]+)/m) || reqText.match(/Feature:\s*([^\n]+)/i);
-        if (titleMatch && titleMatch[1]) {
-          featureGoal = titleMatch[1]
-            .replace(/^(Feature\s*Request|Feature\s*Goal|Requirements|Feature):\s*/i, '')
-            .replace(/^(feat|fix|chore):\s*/i, '')
-            .trim();
-        }
-      }
 
       // Format title cleanly
       const defaultPrTitle = `${prefix}/${ticket} - ${featureGoal}`;
@@ -1471,6 +1472,33 @@ async function runShip(args = []) {
     }
   } else {
     logWarning(`GitHub CLI (\`gh\`) not detected. Your complete PR description is saved in \`${path.relative(process.cwd(), prPath)}\`.`);
+  }
+
+  // 4. Post-Ship Feature Archive & Workspace Reset
+  const defaultArchiveName = slugify(featureGoal || 'completed-feature');
+  console.log(`\n${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+  console.log(`│ 📦 POST-SHIP WORKSPACE CLEANUP & ARCHIVING                         │`);
+  console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
+  console.log(`  [1] ${ANSI.bold}${ANSI.cyan}Archive Feature${ANSI.reset} (Move to .dag/archive/${defaultArchiveName} & keep features clean)`);
+  console.log(`  [2] ${ANSI.bold}Rename in Features${ANSI.reset} (Move to specs/${defaultArchiveName})`);
+  console.log(`  [3] ${ANSI.bold}Keep In Place${ANSI.reset} (Leave in current feature workspace)`);
+  console.log(`${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}`);
+
+  const archiveChoice = await askQuestion(`👉 Select cleanup action [1/2/3] (Default: 1): `);
+  const choice = archiveChoice.trim() || '1';
+
+  if (choice === '1' || choice === '2') {
+    const customName = await askQuestion(`👉 Feature archive name (Press Enter for '${defaultArchiveName}'): `);
+    const finalName = customName.trim() || defaultArchiveName;
+    const destType = choice === '1' ? 'archive' : 'named_feature';
+    
+    const result = archiveFeatureWorkspace(destType, finalName, process.cwd());
+    if (result.success) {
+      logSuccess(`Workspace archived to: ${path.relative(process.cwd(), result.targetDir)}`);
+      console.log(`\n✨ Active feature workspace reset. Ready for your next feature (\`dag new\`)!\n`);
+    } else {
+      logWarning(`Could not archive feature: ${result.message}`);
+    }
   }
 }
 
