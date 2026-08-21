@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { loadConfig } from './config.js';
+import { loadConfig, saveLocalConfig } from './config.js';
 
 export const ARTIFACT_FILES = {
   requirements: '00-requirements.md',
