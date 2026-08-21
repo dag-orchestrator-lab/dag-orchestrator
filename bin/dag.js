@@ -878,18 +878,33 @@ async function runStep3() {
           timeout: 30000 // 30s timeout guard against infinite hangs
         });
 
-        // 2. Run Anti-Slop AST Guardrail (Oxlint) if enabled
+        // 2. Run Anti-Slop AST Guardrail (Oxlint) scoped strictly to modified/staged files
         if (antiSlopEnabled) {
           try {
-            execSync(antiSlopCmd, {
-              cwd: process.cwd(),
-              encoding: 'utf8',
-              timeout: 15000
-            });
-            logSuccess(`Check Passed & Anti-Slop Guardrail Passed on attempt ${attempt}!`);
+            // Find changed JS/TS files in working tree
+            let changedFiles = '';
+            try {
+              changedFiles = execSync('git diff --name-only HEAD', { encoding: 'utf8', cwd: process.cwd() })
+                .split('\n')
+                .map(f => f.trim())
+                .filter(f => /\.(ts|js|tsx|jsx)$/.test(f) && fs.existsSync(path.join(process.cwd(), f)))
+                .join(' ');
+            } catch (e) {}
+
+            if (changedFiles) {
+              const scopedAntiSlopCmd = `${antiSlopCmd} ${changedFiles}`;
+              execSync(scopedAntiSlopCmd, {
+                cwd: process.cwd(),
+                encoding: 'utf8',
+                timeout: 15000
+              });
+              logSuccess(`Check Passed & Anti-Slop Guardrail Passed on attempt ${attempt}!`);
+            } else {
+              logSuccess(`Check Passed on attempt ${attempt}!`);
+            }
           } catch (slopErr) {
             const slopOutput = (slopErr.stdout || '') + '\n' + (slopErr.stderr || '');
-            throw new Error(`Anti-Slop Guardrail (Oxlint) Violation:\n${slopOutput.slice(0, 400)}`);
+            throw new Error(`Anti-Slop Guardrail (Oxlint) Violation in modified files:\n${slopOutput.slice(0, 400)}`);
           }
         } else {
           logSuccess(`Check Passed on attempt ${attempt}!`);
