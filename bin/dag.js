@@ -1152,6 +1152,11 @@ async function runStep4() {
   fs.writeFileSync(reviewPath, `# Final Code Review & Impact Report\n\n## 🔍 Whole-Repo Impact Analysis\n${impactReport}\n\n## 📝 Code Review Summary\n${reviewResult}\n`);
   logSuccess(`Created ${reviewPath}`);
 
+  console.log('\n--- FINAL CODE REVIEW ---');
+  console.log(reviewResult);
+  console.log('-------------------------\n');
+}
+
 async function runShip(args = []) {
   banner('SHIP: BUNDLE CONTRACT & OPEN PULL REQUEST');
   const shipState = getPipelineStatus();
