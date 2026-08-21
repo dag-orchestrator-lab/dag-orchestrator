@@ -1109,7 +1109,7 @@ Format your output cleanly.`;
   logStep('Plan Conformance & Anti-Drift Check', confProvider.name, confProvider.model);
   const conformanceReport = await executeStagePrompt('conformance', '', '', {
     contractText,
-    tasksText,
+    tasksText: `### ACTIVE TASK JUST IMPLEMENTED:\n${activeTaskBlock}`,
     gitDiff
   });
   console.log('\n--- PLAN CONFORMANCE REPORT ---');
