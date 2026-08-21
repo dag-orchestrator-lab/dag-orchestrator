@@ -86,10 +86,12 @@ export function applyRulePreset(presetKeys, cwd = process.cwd()) {
 
 export function loadProjectRules(cwd = process.cwd()) {
   const candidatePaths = [
+    { path: path.join(cwd, 'dag', 'rules', 'rules.md'), label: 'Team Rules (dag/rules/rules.md)' },
     { path: path.join(cwd, 'dag', 'rules', 'team-standards.md'), label: 'Team Standards (dag/rules)' },
     { path: path.join(cwd, 'dag', 'rules.md'), label: 'Team Rules (dag/rules.md)' },
-    { path: path.join(cwd, '.dagrules'), label: 'Team Rules (.dagrules)' },
+    { path: path.join(cwd, '.dag', 'rules', 'rules.md'), label: 'Local Rules (.dag/rules/rules.md)' },
     { path: path.join(cwd, '.dag', 'rules.md'), label: 'Local Rules (.dag/rules.md)' },
+    { path: path.join(cwd, '.dagrules'), label: 'Team Rules (.dagrules)' },
     { path: path.join(cwd, '.dagrules.local'), label: 'Local Rules (.dagrules.local)' },
     { path: path.join(cwd, '.cursorrules'), label: 'Cursor Rules (.cursorrules)' },
     { path: path.join(os.homedir(), '.dagrules'), label: 'Global User Rules (~/.dagrules)' }
@@ -147,13 +149,13 @@ ${projectRules.rules}
 }
 
 export function appendLearnedRule(feedbackText, category = 'General', isLocal = false, cwd = process.cwd()) {
+  const targetDir = isLocal ? path.join(cwd, '.dag', 'rules') : path.join(cwd, 'dag', 'rules');
   const rulePath = isLocal 
-    ? path.join(cwd, '.dag', 'rules.md') 
-    : path.join(cwd, '.dagrules');
+    ? path.join(targetDir, 'rules.md') 
+    : (fs.existsSync(path.join(cwd, '.dagrules')) ? path.join(cwd, '.dagrules') : path.join(targetDir, 'rules.md'));
   
-  // Ensure .dag directory exists for local rules
-  if (isLocal && !fs.existsSync(path.join(cwd, '.dag'))) {
-    fs.mkdirSync(path.join(cwd, '.dag'), { recursive: true });
+  if (!fs.existsSync(targetDir)) {
+    fs.mkdirSync(targetDir, { recursive: true });
   }
 
   let currentContent = '';
