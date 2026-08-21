@@ -1387,6 +1387,30 @@ async function runShip(args = []) {
         currentBranch = execSync('git branch --show-current', { encoding: 'utf8', cwd: process.cwd() }).trim();
       } catch (e) {}
 
+      // Check if user is currently on the default/trunk branch (e.g. develop, main, master)
+      const trunkBranches = ['develop', 'main', 'master', 'staging', 'uat'];
+      if (trunkBranches.includes(currentBranch)) {
+        logWarning(`You are currently on trunk branch '${currentBranch}'. GitHub does not allow opening a PR from '${currentBranch}' into '${currentBranch}'.`);
+        
+        const suggestedBranch = `feat/${slugify(prTitle.replace(/^[^/]+\/[^-]+-\s*/, '') || 'new-feature')}`;
+        const targetBranchAnswer = await askQuestion(`👉 Create and switch to a feature branch first? [branch-name / n] (Default: ${suggestedBranch}): `);
+        
+        if (targetBranchAnswer.trim().toLowerCase() !== 'n') {
+          const newBranch = targetBranchAnswer.trim() || suggestedBranch;
+          try {
+            logStep(`Creating and switching to feature branch '${newBranch}'...`, 'Git', 'git checkout -b');
+            execSync(`git checkout -b "${newBranch}"`, { stdio: 'inherit', cwd: process.cwd() });
+            currentBranch = newBranch;
+            
+            logStep(`Pushing new branch '${currentBranch}' to origin...`, 'Git', 'git push -u origin');
+            execSync(`git push -u origin "${currentBranch}"`, { stdio: 'inherit', cwd: process.cwd() });
+            logSuccess(`Branch '${currentBranch}' pushed successfully!`);
+          } catch (branchErr) {
+            logError(`Failed to create feature branch: ${branchErr.message}`);
+          }
+        }
+      }
+
       try {
         logStep('Creating GitHub Pull Request...', 'GitHub CLI', 'gh pr create');
         
