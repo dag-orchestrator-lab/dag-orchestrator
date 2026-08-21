@@ -1097,6 +1097,7 @@ Format your output cleanly.`;
           return;
         }
       } else {
+        recordGateApproval(3, true);
         logSuccess('Gate 3 Approved! Safe to proceed to Step 4 Review.');
       }
     }
@@ -1682,6 +1683,9 @@ async function main() {
           await runStep2();
         } else if (pipelineStatus.implementedCount < pipelineStatus.totalTasks) {
           logStep(`Smart Pipeline Advancer: Next step is Step 3 (Task Implementation ${pipelineStatus.implementedCount + 1}/${pipelineStatus.totalTasks})`);
+          await runStep3();
+        } else if (!pipelineStatus.gate3Approved) {
+          logStep('Smart Pipeline Advancer: Tasks complete — awaiting Gate 3 (Human Acceptance & Live Verification)');
           await runStep3();
         } else if (!pipelineStatus.hasReview) {
           logStep('Smart Pipeline Advancer: Next step is Step 4 (Full-Repo Impact Review)');

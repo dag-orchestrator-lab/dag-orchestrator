@@ -140,6 +140,7 @@ export function getPipelineStatus(cwd = process.cwd()) {
 
   const gate1Approved = !!gates.gate1?.approved;
   const gate2Approved = !!gates.gate2?.approved;
+  const gate3Approved = !!gates.gate3?.approved;
 
   const state = {
     workspaceDir,
@@ -154,6 +155,7 @@ export function getPipelineStatus(cwd = process.cwd()) {
     hasReview: has(ARTIFACT_FILES.review),
     gate1Approved,
     gate2Approved,
+    gate3Approved,
     blockers: [],
     majors: [],
     implementedCount: 0,
