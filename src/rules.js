@@ -189,8 +189,8 @@ export function extractConventionsFromRecon(reconText = '') {
 }
 
 /**
- * Syncs or Ports rules between Local (.dagrules.local) and Team (.dagrules / dag/rules/team-standards.md)
- * Mode: 'local-to-team' | 'team-to-local' | 'bidirectional'
+ * Syncs rules bidirectionally or unidirectionally without removing from source.
+ * Merges and keeps rules present in both locations.
  */
 export function syncRules(mode = 'bidirectional', cwd = process.cwd()) {
   const teamPath = fs.existsSync(path.join(cwd, 'dag', 'rules', 'team-standards.md'))
@@ -240,4 +240,71 @@ export function syncRules(mode = 'bidirectional', cwd = process.cwd()) {
     teamCount: mergedTeam.length,
     localCount: mergedLocal.length
   };
+}
+
+/**
+ * Ports / Moves rules from Source to Destination, clearing transferred rules from the source.
+ * Mode: 'local-to-team' (moves local -> team) | 'team-to-local' (moves team -> local)
+ */
+export function portRules(mode = 'local-to-team', cwd = process.cwd()) {
+  const teamPath = fs.existsSync(path.join(cwd, 'dag', 'rules', 'team-standards.md'))
+    ? path.join(cwd, 'dag', 'rules', 'team-standards.md')
+    : path.join(cwd, '.dagrules');
+  const localPath = path.join(cwd, '.dagrules.local');
+
+  const teamContent = fs.existsSync(teamPath) ? fs.readFileSync(teamPath, 'utf8').trim() : '';
+  const localContent = fs.existsSync(localPath) ? fs.readFileSync(localPath, 'utf8').trim() : '';
+
+  const parseBullets = text => text.split('\n').filter(l => l.trim().startsWith('- '));
+
+  const teamBullets = parseBullets(teamContent);
+  const localBullets = parseBullets(localContent);
+
+  let portedCount = 0;
+
+  if (mode === 'local-to-team') {
+    // Transfer local rules into team rules, then clear local rules
+    const newTeam = [...teamBullets];
+    for (const b of localBullets) {
+      if (!newTeam.includes(b)) {
+        newTeam.push(b);
+        portedCount++;
+      }
+    }
+    const teamHeader = teamContent.startsWith('#') ? teamContent.split('\n')[0] : '# Team Engineering Policies & Architecture Rules';
+    fs.writeFileSync(teamPath, `${teamHeader}\n${newTeam.join('\n')}\n`, 'utf8');
+
+    // Reset local rules to empty template
+    fs.writeFileSync(localPath, '# Local Developer Rules (Gitignored)\n', 'utf8');
+
+    return {
+      mode,
+      from: path.basename(localPath),
+      to: path.basename(teamPath),
+      portedCount,
+      totalAtDest: newTeam.length
+    };
+  } else if (mode === 'team-to-local') {
+    // Transfer team rules into local rules, then clear team rules
+    const newLocal = [...localBullets];
+    for (const b of teamBullets) {
+      if (!newLocal.includes(b)) {
+        newLocal.push(b);
+        portedCount++;
+      }
+    }
+    const localHeader = localContent.startsWith('#') ? localContent.split('\n')[0] : '# Local Developer Rules (Gitignored)';
+    fs.writeFileSync(localPath, `${localHeader}\n${newLocal.join('\n')}\n`, 'utf8');
+
+    // Reset team rules to empty template
+    fs.writeFileSync(teamPath, '# Team Engineering Policies & Architecture Rules\n', 'utf8');
+
+    return {
+      mode,
+      from: path.basename(teamPath),
+      to: path.basename(localPath),
+      portedCount,
+      totalAtDest: newLocal.length
+    };
+  }
 }
