@@ -1262,7 +1262,46 @@ async function runShip(args = []) {
   const tasksContent = fs.existsSync(tasksPath) ? fs.readFileSync(tasksPath, 'utf8') : '';
   const reviewContent = fs.existsSync(reviewPath) ? fs.readFileSync(reviewPath, 'utf8') : '';
 
-  const prBody = `## 🚀 Feature Summary
+  // Check for repository or team PR template
+  const candidateTemplates = [
+    path.join(process.cwd(), '.github', 'pull_request_template.md'),
+    path.join(process.cwd(), '.github', 'PULL_REQUEST_TEMPLATE.md'),
+    path.join(process.cwd(), 'pull_request_template.md'),
+    path.join(process.cwd(), 'PULL_REQUEST_TEMPLATE.md'),
+    path.join(process.cwd(), 'dag', 'templates', 'pr.md'),
+    path.join(process.cwd(), '.dag', 'pr_template.md')
+  ];
+
+  let prBody = '';
+  let usedCustomTemplate = false;
+
+  for (const tPath of candidateTemplates) {
+    if (fs.existsSync(tPath)) {
+      try {
+        let template = fs.readFileSync(tPath, 'utf8');
+        if (template.trim()) {
+          // If template has DAG placeholders, substitute them
+          if (template.includes('{{REQUIREMENTS}}') || template.includes('{{CONTRACTS}}') || template.includes('{{TASKS}}')) {
+            prBody = template
+              .replace(/\{\{REQUIREMENTS\}\}/g, reqContent)
+              .replace(/\{\{CONTRACTS\}\}/g, contractContent + (addendumContent ? `\n\n### 📝 Addendum\n${addendumContent}` : ''))
+              .replace(/\{\{FINDINGS\}\}/g, findingsContent)
+              .replace(/\{\{TASKS\}\}/g, tasksContent)
+              .replace(/\{\{REVIEW\}\}/g, reviewContent);
+          } else {
+            // Append DAG verification audit block below existing company template
+            prBody = `${template.trim()}\n\n---\n\n## 🛡️ DAG Orchestrator Verification & Audit Trail\n\n<details>\n<summary>📜 Interface Contract (02-contracts.md)</summary>\n\n${contractContent}\n${addendumContent ? `\n### 📝 Live Testing Addendum\n${addendumContent}` : ''}\n\n</details>\n\n<details>\n<summary>🧐 Adversarial Skeptic Audit (04-findings.md)</summary>\n\n${findingsContent}\n\n</details>\n\n<details>\n<summary>✅ Verified Tasks (05-tasks.md)</summary>\n\n${tasksContent}\n\n</details>\n${reviewContent ? `\n<details>\n<summary>📝 Whole-Repo Impact Analysis</summary>\n\n${reviewContent}\n\n</details>` : ''}\n`;
+          }
+          usedCustomTemplate = true;
+          logSuccess(`Applied custom PR template from ${path.relative(process.cwd(), tPath)}`);
+          break;
+        }
+      } catch (e) {}
+    }
+  }
+
+  if (!usedCustomTemplate) {
+    prBody = `## 🚀 Feature Summary
 ${reqContent.slice(0, 1500)}
 
 ---
@@ -1292,6 +1331,7 @@ ${findingsContent}
 ${tasksContent}
 ${reviewContent ? `\n---\n\n## 📝 Whole-Repo Review & Impact Analysis\n<details>\n<summary>Click to view Review Report</summary>\n\n${reviewContent}\n\n</details>` : ''}
 `;
+  }
 
   const featureDir = getFeatureWorkspaceDir();
   const prPath = path.join(featureDir, 'PR_DESCRIPTION.md');
