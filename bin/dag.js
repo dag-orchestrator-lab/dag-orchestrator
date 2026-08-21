@@ -138,10 +138,11 @@ async function ensureRepoInit(cwd = process.cwd(), force = false) {
     }
   }
 
-  // Ensure dsh.config.yaml exists in the repository for DeepSeek Harness users
-  const dshConfigPath = path.join(cwd, 'dsh.config.yaml');
-  if (!fs.existsSync(dshConfigPath)) {
-    const defaultDshYaml = `# DeepSeek Harness (dsh) Multi-Agent Configuration
+  // Only create dsh.config.yaml if user explicitly selects DeepSeek Harness (dsh)
+  if (chosenHarness === 'dsh') {
+    const dshConfigPath = path.join(cwd, '.dag', 'dsh.config.yaml');
+    if (!fs.existsSync(dshConfigPath)) {
+      const defaultDshYaml = `# DeepSeek Harness (dsh) Multi-Agent Configuration
 version: "1.0"
 
 models:
@@ -180,8 +181,9 @@ workflow:
     impact_model: gemini-pro
     review_model: claude-code
 `;
-    fs.writeFileSync(dshConfigPath, defaultDshYaml);
-    logSuccess('Created default dsh.config.yaml (DeepSeek Harness)');
+      fs.writeFileSync(dshConfigPath, defaultDshYaml);
+      logSuccess('Created .dag/dsh.config.yaml (DeepSeek Harness)');
+    }
   }
 
   saveLocalConfig({
