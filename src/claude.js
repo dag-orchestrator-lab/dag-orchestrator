@@ -141,3 +141,59 @@ IMPORTANT: Do NOT use tools or ask for permissions. Output the markdown review d
 
   return await runClaudePrompt(prompt, cwd);
 }
+
+/**
+ * Step 5 / Ship: AI Synthesis of Concise PR Description conforming to Confluence template
+ */
+export async function claudeGeneratePrDescription(context, cwd = process.cwd()) {
+  const { reqContent, contractContent, tasksContent, gitDiff, templateContent } = context;
+
+  const prompt = `You are writing a clean, professional, and human-readable Pull Request (PR) description.
+
+Template to follow:
+${templateContent || `
+# Description
+Briefly describe what this PR does (2-3 concise bullet points).
+
+# Changes
+* Added:
+  * ...
+* Updated:
+  * ...
+* Removed:
+  * ...
+
+# Testing
+[x] Unit tests
+[x] Integration tests
+[x] Manual testing
+
+Tested by:
+* ...
+
+# Breaking Changes
+[x] No
+[ ] Yes
+
+# Notes
+Any non-obvious context or caveats for reviewers.
+`}
+
+Context Inputs:
+- Feature Requirements:
+${reqContent.slice(0, 1500)}
+
+- Completed Tasks:
+${tasksContent.slice(0, 2000)}
+
+- Git Diff:
+${gitDiff.slice(0, 3000)}
+
+Instructions:
+1. Do NOT dump raw markdown files or entire contract specs into the PR.
+2. Synthesize concise, human-readable bullet points explaining WHY the change was made, WHAT was touched, and HOW it was tested.
+3. Common words only, avoid fluff or synthetic boilerplate.
+4. Output ONLY the raw markdown of the PR description, no introductory chat.`;
+
+  return await runClaudePrompt(prompt, cwd);
+}

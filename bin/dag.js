@@ -33,6 +33,7 @@ import { isFrontendTask, processUIDesignReference, formatUIContractSection } fro
 import { banner, logStep, logSuccess, logWarning, logError, logGate, renderStatusCard, ANSI } from '../src/ui.js';
 import { getProviderForStage, executeStagePrompt } from '../src/providers/index.js';
 import { geminiPromptRefine, geminiConsultArchitect } from '../src/gemini.js';
+import { claudeGeneratePrDescription } from '../src/claude.js';
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -1262,6 +1263,12 @@ async function runShip(args = []) {
   const tasksContent = fs.existsSync(tasksPath) ? fs.readFileSync(tasksPath, 'utf8') : '';
   const reviewContent = fs.existsSync(reviewPath) ? fs.readFileSync(reviewPath, 'utf8') : '';
 
+  // Get active git diff for smart change summary
+  let gitDiff = '';
+  try {
+    gitDiff = execSync('git diff origin/HEAD...HEAD || git diff HEAD~1 || git diff', { encoding: 'utf8', cwd: process.cwd() }).slice(0, 4000);
+  } catch (e) {}
+
   // Check for repository or team PR template
   const candidateTemplates = [
     path.join(process.cwd(), '.github', 'pull_request_template.md'),
@@ -1273,65 +1280,62 @@ async function runShip(args = []) {
     path.join(process.cwd(), '.dag', 'pr_template.md')
   ];
 
-  let prBody = '';
-  let usedCustomTemplate = false;
-
+  let customTemplateText = '';
   for (const tPath of candidateTemplates) {
     if (fs.existsSync(tPath)) {
       try {
-        let template = fs.readFileSync(tPath, 'utf8');
-        if (template.trim()) {
-          // If template has DAG placeholders, substitute them
-          if (template.includes('{{REQUIREMENTS}}') || template.includes('{{CONTRACTS}}') || template.includes('{{TASKS}}')) {
-            prBody = template
-              .replace(/\{\{REQUIREMENTS\}\}/g, reqContent)
-              .replace(/\{\{CONTRACTS\}\}/g, contractContent + (addendumContent ? `\n\n### 📝 Addendum\n${addendumContent}` : ''))
-              .replace(/\{\{FINDINGS\}\}/g, findingsContent)
-              .replace(/\{\{TASKS\}\}/g, tasksContent)
-              .replace(/\{\{REVIEW\}\}/g, reviewContent);
-          } else {
-            // Append DAG verification audit block below existing company template
-            prBody = `${template.trim()}\n\n---\n\n## 🛡️ DAG Orchestrator Verification & Audit Trail\n\n<details>\n<summary>📜 Interface Contract (02-contracts.md)</summary>\n\n${contractContent}\n${addendumContent ? `\n### 📝 Live Testing Addendum\n${addendumContent}` : ''}\n\n</details>\n\n<details>\n<summary>🧐 Adversarial Skeptic Audit (04-findings.md)</summary>\n\n${findingsContent}\n\n</details>\n\n<details>\n<summary>✅ Verified Tasks (05-tasks.md)</summary>\n\n${tasksContent}\n\n</details>\n${reviewContent ? `\n<details>\n<summary>📝 Whole-Repo Impact Analysis</summary>\n\n${reviewContent}\n\n</details>` : ''}\n`;
-          }
-          usedCustomTemplate = true;
-          logSuccess(`Applied custom PR template from ${path.relative(process.cwd(), tPath)}`);
+        const txt = fs.readFileSync(tPath, 'utf8').trim();
+        if (txt) {
+          customTemplateText = txt;
           break;
         }
       } catch (e) {}
     }
   }
 
-  if (!usedCustomTemplate) {
-    prBody = `## 🚀 Feature Summary
-${reqContent.slice(0, 1500)}
+  let prBody = '';
 
----
+  console.log(`\n${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+  console.log(`│ 📝 PULL REQUEST DESCRIPTION GENERATOR                              │`);
+  console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
+  console.log(`  [1] ${ANSI.bold}${ANSI.cyan}AI-Synthesized Concise PR${ANSI.reset} (Human-readable Confluence bullets, clean)`);
+  console.log(`  [2] ${ANSI.bold}Direct Spec Bundle${ANSI.reset} (Includes collapsible contracts & audit trails)`);
+  console.log(`${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}`);
 
-## 📜 Interface Contract (02-contracts.md)
-<details>
-<summary>Click to view Contract Specification</summary>
+  const prStyleChoice = await askQuestion('👉 Select PR description format [1/2] (Default: 1): ');
 
-${contractContent}
-${addendumContent ? `\n### 📝 Live Testing Addendum\n${addendumContent}` : ''}
+  if (!prStyleChoice.trim() || prStyleChoice.trim() === '1') {
+    logStep('Synthesizing concise, human-readable PR description...', 'AI Synthesizer', 'claudeGeneratePrDescription');
+    try {
+      prBody = await claudeGeneratePrDescription({
+        reqContent,
+        contractContent,
+        tasksContent,
+        gitDiff,
+        templateContent: customTemplateText
+      }, process.cwd());
+      logSuccess('AI PR description generated successfully!');
+    } catch (aiErr) {
+      logWarning(`AI generation failed (${aiErr.message}), falling back to standard template.`);
+    }
+  }
 
-</details>
-
----
-
-## 🧐 Adversarial Skeptic Audit (04-findings.md)
-<details>
-<summary>Click to view Skeptic Audit</summary>
-
-${findingsContent}
-
-</details>
-
----
-
-## ✅ Implementation Checklist (05-tasks.md)
-${tasksContent}
-${reviewContent ? `\n---\n\n## 📝 Whole-Repo Review & Impact Analysis\n<details>\n<summary>Click to view Review Report</summary>\n\n${reviewContent}\n\n</details>` : ''}
-`;
+  if (!prBody) {
+    // Direct Template or Fallback
+    if (customTemplateText) {
+      if (customTemplateText.includes('{{REQUIREMENTS}}') || customTemplateText.includes('{{CONTRACTS}}') || customTemplateText.includes('{{TASKS}}')) {
+        prBody = customTemplateText
+          .replace(/\{\{REQUIREMENTS\}\}/g, reqContent)
+          .replace(/\{\{CONTRACTS\}\}/g, contractContent + (addendumContent ? `\n\n### 📝 Addendum\n${addendumContent}` : ''))
+          .replace(/\{\{FINDINGS\}\}/g, findingsContent)
+          .replace(/\{\{TASKS\}\}/g, tasksContent)
+          .replace(/\{\{REVIEW\}\}/g, reviewContent);
+      } else {
+        prBody = `${customTemplateText}\n\n---\n\n## 🛡️ Verification & Audit Trail\n\n<details>\n<summary>📜 Interface Contract (02-contracts.md)</summary>\n\n${contractContent}\n\n</details>\n\n<details>\n<summary>🧐 Skeptic Audit</summary>\n\n${findingsContent}\n\n</details>\n\n<details>\n<summary>✅ Tasks</summary>\n\n${tasksContent}\n\n</details>\n`;
+      }
+    } else {
+      prBody = `## 🚀 Feature Summary\n${reqContent.slice(0, 1500)}\n\n---\n\n## 📜 Interface Contract\n<details>\n<summary>Click to view Contract</summary>\n\n${contractContent}\n\n</details>\n\n## ✅ Tasks Checklist\n${tasksContent}\n`;
+    }
   }
 
   const featureDir = getFeatureWorkspaceDir();
