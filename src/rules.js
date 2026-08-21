@@ -89,8 +89,8 @@ export function loadProjectRules(cwd = process.cwd()) {
     { path: path.join(cwd, 'dag', 'rules', 'team-standards.md'), label: 'Team Standards (dag/rules)' },
     { path: path.join(cwd, 'dag', 'rules.md'), label: 'Team Rules (dag/rules.md)' },
     { path: path.join(cwd, '.dagrules'), label: 'Team Rules (.dagrules)' },
-    { path: path.join(cwd, '.dagrules.local'), label: 'Local Rules (.dagrules.local)' },
     { path: path.join(cwd, '.dag', 'rules.md'), label: 'Local Rules (.dag/rules.md)' },
+    { path: path.join(cwd, '.dagrules.local'), label: 'Local Rules (.dagrules.local)' },
     { path: path.join(cwd, '.cursorrules'), label: 'Cursor Rules (.cursorrules)' },
     { path: path.join(os.homedir(), '.dagrules'), label: 'Global User Rules (~/.dagrules)' }
   ];
@@ -147,8 +147,15 @@ ${projectRules.rules}
 }
 
 export function appendLearnedRule(feedbackText, category = 'General', isLocal = false, cwd = process.cwd()) {
-  const ruleFileName = isLocal ? '.dagrules.local' : '.dagrules';
-  const rulePath = path.join(cwd, ruleFileName);
+  const rulePath = isLocal 
+    ? path.join(cwd, '.dag', 'rules.md') 
+    : path.join(cwd, '.dagrules');
+  
+  // Ensure .dag directory exists for local rules
+  if (isLocal && !fs.existsSync(path.join(cwd, '.dag'))) {
+    fs.mkdirSync(path.join(cwd, '.dag'), { recursive: true });
+  }
+
   let currentContent = '';
   
   if (fs.existsSync(rulePath)) {
@@ -207,7 +214,13 @@ export function syncRules(mode = 'bidirectional', cwd = process.cwd()) {
   const teamPath = fs.existsSync(path.join(cwd, 'dag', 'rules', 'team-standards.md'))
     ? path.join(cwd, 'dag', 'rules', 'team-standards.md')
     : path.join(cwd, '.dagrules');
-  const localPath = path.join(cwd, '.dagrules.local');
+  const localPath = fs.existsSync(path.join(cwd, '.dag', 'rules.md'))
+    ? path.join(cwd, '.dag', 'rules.md')
+    : (fs.existsSync(path.join(cwd, '.dagrules.local')) ? path.join(cwd, '.dagrules.local') : path.join(cwd, '.dag', 'rules.md'));
+
+  if (!fs.existsSync(path.join(cwd, '.dag'))) {
+    fs.mkdirSync(path.join(cwd, '.dag'), { recursive: true });
+  }
 
   const teamContent = fs.existsSync(teamPath) ? fs.readFileSync(teamPath, 'utf8').trim() : '';
   const localContent = fs.existsSync(localPath) ? fs.readFileSync(localPath, 'utf8').trim() : '';
@@ -261,7 +274,13 @@ export function portRules(mode = 'local-to-team', cwd = process.cwd()) {
   const teamPath = fs.existsSync(path.join(cwd, 'dag', 'rules', 'team-standards.md'))
     ? path.join(cwd, 'dag', 'rules', 'team-standards.md')
     : path.join(cwd, '.dagrules');
-  const localPath = path.join(cwd, '.dagrules.local');
+  const localPath = fs.existsSync(path.join(cwd, '.dag', 'rules.md'))
+    ? path.join(cwd, '.dag', 'rules.md')
+    : (fs.existsSync(path.join(cwd, '.dagrules.local')) ? path.join(cwd, '.dagrules.local') : path.join(cwd, '.dag', 'rules.md'));
+
+  if (!fs.existsSync(path.join(cwd, '.dag'))) {
+    fs.mkdirSync(path.join(cwd, '.dag'), { recursive: true });
+  }
 
   const teamContent = fs.existsSync(teamPath) ? fs.readFileSync(teamPath, 'utf8').trim() : '';
   const localContent = fs.existsSync(localPath) ? fs.readFileSync(localPath, 'utf8').trim() : '';
