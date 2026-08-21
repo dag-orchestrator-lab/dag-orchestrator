@@ -1136,8 +1136,41 @@ Format your output cleanly.`;
     }
     console.log(`  • Run ${ANSI.bold}dag status${ANSI.reset} to inspect overall pipeline artifacts.`);
     console.log(`${ANSI.brightGreen}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}\n`);
+  } else {
+    console.log(`${ANSI.brightYellow}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+    console.log(`│ ⚠️ PLAN DRIFT DETECTED: Action Required!                            │`);
+    console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
+    console.log(`  The auditor detected a divergence from the strict contract or task.`);
+    console.log(`  1. Ignore drift and proceed (if you manually resolved it).`);
+    console.log(`  2. Rollback the changes and retry this task.`);
+    console.log(`  3. Exit to fix manually.`);
+    console.log(`${ANSI.brightYellow}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}\n`);
 
-    // Gate 3: Human Test Acceptance & Contract Addendum Gate
+    const driftChoice = await askQuestion(`${ANSI.brightYellow}👉 Select action [1/2/3] (Default: 3): ${ANSI.reset}`);
+    const choice = driftChoice.trim();
+    if (choice === '1') {
+      logSuccess('Drift intentionally ignored by user. Proceeding.');
+    } else if (choice === '2') {
+      console.log(`${ANSI.brightYellow}⚠️ Rolling back changes (git reset --hard && git clean -fd)...${ANSI.reset}`);
+      require('node:child_process').execSync('git reset --hard && git clean -fd', { stdio: 'inherit' });
+      // Remove the [x] from the task since we rolled back
+      const tasksTextCurrent = fs.readFileSync(tasksPath, 'utf8');
+      const taskBlocksCurrent = tasksTextCurrent.split(/(?=###\s+(?:\[[ x]\]\s*)?T-\d+)/gi);
+      for (let i = 0; i < taskBlocksCurrent.length; i++) {
+        if (taskBlocksCurrent[i].includes(`[x] ${activeTaskId}`) || taskBlocksCurrent[i].includes(`[x] ${activeTaskId.replace('T-','')}`)) {
+           taskBlocksCurrent[i] = taskBlocksCurrent[i].replace(/###\s+\[x\]\s*(T-\d+)/i, '### $1');
+        }
+      }
+      fs.writeFileSync(tasksPath, taskBlocksCurrent.join(''));
+      console.log(`${ANSI.brightRed}❌ Rollback complete. Run 'dag next' to try again.${ANSI.reset}`);
+      process.exit(1);
+    } else {
+      console.log(`${ANSI.brightRed}❌ Exiting for manual resolution. Run 'dag next' when fixed.${ANSI.reset}`);
+      process.exit(1);
+    }
+  }
+
+  // Gate 3: Human Test Acceptance & Contract Addendum Gate
     if (currentStatus.implementedCount >= currentStatus.totalTasks && currentStatus.totalTasks > 0) {
       console.log(`${ANSI.brightCyan}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
       console.log(`│ 🛑 GATE 3: HUMAN ACCEPTANCE & LIVE TEST VERIFICATION               │`);
