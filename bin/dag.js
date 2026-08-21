@@ -1198,12 +1198,26 @@ async function runShip(args = []) {
     const doCommit = await askQuestion('👉 Stage all modified feature files, commit, and push branch now? [Y/n] (Default: Y): ');
     if (!doCommit.trim() || doCommit.toLowerCase() === 'y' || doCommit.toLowerCase() === 'yes') {
       if (!commitTitle) {
-        commitTitle = await askQuestion('👉 Enter commit message (e.g. feat: implement campaign dropdown): ');
+        // Derive smart default commit message from requirements or feature name
+        let defaultMsg = 'feat: implement feature via DAG Orchestrator';
+        const reqPath = resolveArtifactPath('00-requirements.md');
+        if (fs.existsSync(reqPath)) {
+          const reqText = fs.readFileSync(reqPath, 'utf8');
+          const titleMatch = reqText.match(/^#\s*([^\n]+)/m) || reqText.match(/Feature:\s*([^\n]+)/i);
+          if (titleMatch && titleMatch[1]) {
+            const rawTitle = titleMatch[1].replace(/^(Feature\s*Request|Feature\s*Goal|Requirements):\s*/i, '').trim();
+            defaultMsg = `feat: ${rawTitle.toLowerCase().slice(0, 65)}`;
+          }
+        }
+
+        console.log(`\n💡 Suggested Commit Message: ${ANSI.bold}${ANSI.cyan}${defaultMsg}${ANSI.reset}`);
+        const userMsg = await askQuestion(`👉 Enter commit message (Press Enter to accept suggestion): `);
+        commitTitle = userMsg.trim() || defaultMsg;
       }
       try {
         logStep('Staging and committing feature files...', 'Git', 'git commit');
         execSync('git add -A', { stdio: 'inherit', cwd: process.cwd() });
-        execSync(`git commit -m "${(commitTitle || 'feat: update feature via DAG Orchestrator').replace(/"/g, '\\"')}"`, { stdio: 'inherit', cwd: process.cwd() });
+        execSync(`git commit -m "${commitTitle.replace(/"/g, '\\"')}"`, { stdio: 'inherit', cwd: process.cwd() });
         logSuccess('Commit created successfully!');
 
         logStep('Pushing branch to origin...', 'Git', 'git push');
