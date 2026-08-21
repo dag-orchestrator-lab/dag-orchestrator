@@ -13,6 +13,7 @@ export const ARTIFACT_FILES = {
   layerFindings: '04-layer-findings.md',
   tasks: '05-tasks.md',
   review: 'REVIEW.md',
+  prDescription: 'PR_DESCRIPTION.md',
   gatesState: '.dag-gates.json'
 };
 

@@ -1277,9 +1277,8 @@ ${findingsContent}
 ${tasksContent}
 `;
 
-  const prPath = fs.existsSync(path.join(process.cwd(), '.dag'))
-    ? path.join(process.cwd(), '.dag', 'PR_DESCRIPTION.md')
-    : resolveArtifactPath('PR_DESCRIPTION.md');
+  const featureDir = getFeatureWorkspaceDir();
+  const prPath = path.join(featureDir, 'PR_DESCRIPTION.md');
 
   fs.writeFileSync(prPath, prBody);
   logSuccess(`Generated ${path.relative(process.cwd(), prPath)}`);
