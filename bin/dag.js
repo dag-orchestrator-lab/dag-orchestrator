@@ -1438,8 +1438,14 @@ async function runShip(args = []) {
         }
       }
 
+      // Determine target base branch
+      const defaultBaseBranch = config.STACKED_BASE_BRANCH || 'develop';
+      console.log(`\n🎯 Target Base Branch: ${ANSI.bold}${ANSI.green}${defaultBaseBranch}${ANSI.reset}`);
+      const userBaseAnswer = await askQuestion(`👉 Enter target base branch (Press Enter for '${defaultBaseBranch}'): `);
+      const baseBranch = userBaseAnswer.trim() || defaultBaseBranch;
+
       try {
-        logStep('Creating GitHub Pull Request...', 'GitHub CLI', 'gh pr create');
+        logStep(`Creating GitHub Pull Request (${currentBranch} ➔ ${baseBranch})...`, 'GitHub CLI', 'gh pr create');
         
         // Ensure the current branch is pushed to remote with tracking before calling gh pr create
         try {
@@ -1447,7 +1453,8 @@ async function runShip(args = []) {
         } catch (e) {}
 
         const headFlag = currentBranch ? `--head "${currentBranch}"` : '';
-        const prCmd = `gh pr create --title "${prTitle.replace(/"/g, '\\"')}" --body-file "${prPath}" ${headFlag}`.trim();
+        const baseFlag = baseBranch ? `--base "${baseBranch}"` : '';
+        const prCmd = `gh pr create --title "${prTitle.replace(/"/g, '\\"')}" --body-file "${prPath}" ${headFlag} ${baseFlag}`.trim();
         const prOutput = execSync(prCmd, { encoding: 'utf8', cwd: process.cwd() });
         logSuccess(`Pull Request Created:\n${prOutput}`);
       } catch (err) {
