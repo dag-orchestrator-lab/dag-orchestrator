@@ -119,16 +119,22 @@ async function ensureRepoInit(cwd = process.cwd(), force = false) {
   else if (pTrimmed === '4') chosenPreset = 'deepseek';
   else if (pTrimmed === '5') chosenPreset = 'local';
 
-  // Ask about .gitignore
-  if (shouldGitignore || specsDir === '.dag/features') {
-    const gitignorePath = path.join(cwd, '.gitignore');
-    if (fs.existsSync(gitignorePath)) {
-      let gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
-      if (!gitignoreContent.includes('.dag/')) {
-        gitignoreContent += '\n# DAG Orchestrator workspace and local backups\n.dag/\n';
-        fs.writeFileSync(gitignorePath, gitignoreContent);
-        logSuccess('Added .dag/ to .gitignore');
-      }
+  // Always ensure .dag/ (local cache/backups) and local overrides are in .gitignore
+  const gitignorePath = path.join(cwd, '.gitignore');
+  if (fs.existsSync(gitignorePath)) {
+    let gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
+    let added = false;
+    if (!gitignoreContent.includes('.dag/')) {
+      gitignoreContent += '\n# DAG Orchestrator local cache, gates, and snapshots\n.dag/\n';
+      added = true;
+    }
+    if (!gitignoreContent.includes('.dagrules.local')) {
+      gitignoreContent += '.dagrules.local\n';
+      added = true;
+    }
+    if (added) {
+      fs.writeFileSync(gitignorePath, gitignoreContent);
+      logSuccess('Ensured .dag/ and .dagrules.local are in .gitignore');
     }
   }
 

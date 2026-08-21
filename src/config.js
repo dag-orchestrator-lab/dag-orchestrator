@@ -9,7 +9,7 @@ export const DEFAULT_CONFIG = {
   DEFAULT_PROVIDER_PRESET: 'hybrid', // hybrid | gemini | claude | deepseek | ollama
   
   // Workspace and Feature Spec Configuration
-  SPECS_DIR: '', // empty = auto-detect or docs/features
+  SPECS_DIR: 'dag/features', // default: dag/features (committed) or .dag/features (local-only)
   ACTIVE_FEATURE: '', // active feature folder name
   
   // Specific stage provider overrides

@@ -34,22 +34,29 @@ export function getFeatureWorkspaceDir(cwd = process.cwd()) {
     return dir;
   }
 
-  // 2. Check docs/features/ or .dag/features/
-  const baseSpecsDir = config.SPECS_DIR || 'docs/features';
-  const targetBase = path.join(cwd, baseSpecsDir);
+  // 2. Check dag/features/, .dag/features/, or docs/features/
+  const candidateDirs = [
+    config.SPECS_DIR ? path.join(cwd, config.SPECS_DIR) : null,
+    path.join(cwd, 'dag', 'features'),
+    path.join(cwd, '.dag', 'features'),
+    path.join(cwd, 'docs', 'features')
+  ].filter(Boolean);
 
-  if (fs.existsSync(targetBase)) {
-    const subdirs = fs.readdirSync(targetBase)
-      .filter(f => fs.statSync(path.join(targetBase, f)).isDirectory())
-      .sort()
-      .reverse();
-    if (subdirs.length > 0) {
-      return path.join(targetBase, subdirs[0]);
+  for (const targetBase of candidateDirs) {
+    if (fs.existsSync(targetBase)) {
+      const subdirs = fs.readdirSync(targetBase)
+        .filter(f => fs.statSync(path.join(targetBase, f)).isDirectory())
+        .sort()
+        .reverse();
+      if (subdirs.length > 0) {
+        return path.join(targetBase, subdirs[0]);
+      }
     }
   }
 
-  // 3. Auto-create date-stamped feature dir in target base
-  const defaultDir = path.join(targetBase, 'current-feature');
+  // 3. Auto-create in default specs dir (dag/features/current-feature)
+  const defaultBase = path.join(cwd, config.SPECS_DIR || 'dag/features');
+  const defaultDir = path.join(defaultBase, 'current-feature');
   if (!fs.existsSync(defaultDir)) {
     fs.mkdirSync(defaultDir, { recursive: true });
   }

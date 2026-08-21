@@ -86,7 +86,11 @@ export function applyRulePreset(presetKeys, cwd = process.cwd()) {
 
 export function loadProjectRules(cwd = process.cwd()) {
   const candidatePaths = [
+    path.join(cwd, 'dag', 'rules', 'team-standards.md'),
+    path.join(cwd, 'dag', 'rules.md'),
     path.join(cwd, '.dagrules'),
+    path.join(cwd, '.dagrules.local'),
+    path.join(cwd, '.dag', 'rules.md'),
     path.join(cwd, '.cursorrules'),
     path.join(os.homedir(), '.dagrules')
   ];
