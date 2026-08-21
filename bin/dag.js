@@ -1053,10 +1053,53 @@ Format your output cleanly.`;
     if (currentStatus.implementedCount < currentStatus.totalTasks) {
       console.log(`  • Run ${ANSI.bold}dag next${ANSI.reset} (or ${ANSI.bold}dag implement${ANSI.reset}) to implement Task ${currentStatus.implementedCount + 1}/${currentStatus.totalTasks}.`);
     } else {
-      console.log(`  • All tasks completed! Run ${ANSI.bold}dag next${ANSI.reset} (or ${ANSI.bold}dag review${ANSI.reset}) for final impact review.`);
+      console.log(`  • All tasks completed! Ready for Human Acceptance.`);
     }
     console.log(`  • Run ${ANSI.bold}dag status${ANSI.reset} to inspect overall pipeline artifacts.`);
     console.log(`${ANSI.brightGreen}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}\n`);
+
+    // Gate 3: Human Test Acceptance & Contract Addendum Gate
+    if (currentStatus.implementedCount >= currentStatus.totalTasks && currentStatus.totalTasks > 0) {
+      console.log(`${ANSI.brightCyan}${ANSI.bold}┌────────────────────────────────────────────────────────────────────┐`);
+      console.log(`│ 🛑 GATE 3: HUMAN ACCEPTANCE & LIVE TEST VERIFICATION               │`);
+      console.log(`├────────────────────────────────────────────────────────────────────┤${ANSI.reset}`);
+      console.log(`  All tasks in plan are complete. Test your local app/server now.`);
+      console.log(`  • Press ${ANSI.bold}Enter (or type 'Y')${ANSI.reset} to approve live behavior & proceed to Step 4 Review.`);
+      console.log(`  • Or ${ANSI.bold}paste bug findings / additions${ANSI.reset} to record an addendum and generate new tasks.`);
+      console.log(`${ANSI.brightCyan}${ANSI.bold}└────────────────────────────────────────────────────────────────────┘${ANSI.reset}`);
+
+      const gate3Input = await askMultiLine('👉 Your decision / findings:');
+      const trimmedGate3 = gate3Input.trim();
+
+      if (trimmedGate3 && trimmedGate3.toLowerCase() !== 'y' && trimmedGate3.toLowerCase() !== 'yes') {
+        logStep('Recording Contract Addendum & generating new tasks...', codingProvider.name, codingProvider.model);
+        
+        // 1. Write or append to 02-contracts.addendum.md
+        const addendumPath = resolveArtifactPath('02-contracts.addendum.md');
+        const existingAddendum = fs.existsSync(addendumPath) ? fs.readFileSync(addendumPath, 'utf8') : '';
+        const newAddendumContent = `${existingAddendum}\n\n## 📝 Human Test Findings & Addendum (${new Date().toLocaleString()})\n${trimmedGate3}\n`.trim();
+        fs.writeFileSync(addendumPath, newAddendumContent, 'utf8');
+        logSuccess(`Updated ${addendumPath}`);
+
+        // 2. Ask Claude to generate new addendum tasks and append to 05-tasks.md
+        const addendumTaskPrompt = `The user conducted manual live testing and provided the following findings/additions:\n\n${trimmedGate3}\n\nCurrent 05-tasks.md:\n${tasksText}\n\nPlease append new sequential tasks (e.g. T-${currentStatus.totalTasks + 1}, T-${currentStatus.totalTasks + 2}) to 05-tasks.md to implement and verify these findings. Follow TDD style and include specific file paths and verification Checks. Return ONLY the complete updated 05-tasks.md markdown.`;
+        
+        const updatedTasks = await executeStagePrompt('coding', addendumTaskPrompt, '', {
+          taskText: addendumTaskPrompt,
+          contractText: `${contractText}\n\n${newAddendumContent}`,
+          cwd: process.cwd()
+        });
+
+        if (updatedTasks && updatedTasks.includes('### T-')) {
+          fs.writeFileSync(resolveArtifactPath(ARTIFACT_FILES.tasks), updatedTasks.trim(), 'utf8');
+          logSuccess(`Appended new addendum tasks to 05-tasks.md`);
+          console.log(`\n${ANSI.brightGreen}${ANSI.bold}🚀 New addendum tasks registered! Run ${ANSI.underline}dag implement${ANSI.reset} (or ${ANSI.underline}dag next${ANSI.reset}) to implement them.${ANSI.reset}\n`);
+          return;
+        }
+      } else {
+        logSuccess('Gate 3 Approved! Safe to proceed to Step 4 Review.');
+      }
+    }
   }
 }
 
