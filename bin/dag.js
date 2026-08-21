@@ -1117,9 +1117,9 @@ Format your output cleanly.`;
   console.log('-------------------------------\n');
 
   // Provide explicit, affirmative actionable guidance with live progress bar
+  const currentStatus = getPipelineStatus(process.cwd());
   const isAllConforming = !/drift detected|fail/i.test(conformanceReport) || /all active tasks in diff conform/i.test(conformanceReport);
   if (isAllConforming) {
-    const currentStatus = getPipelineStatus(process.cwd());
     const pct = currentStatus.totalTasks > 0 ? Math.round((currentStatus.implementedCount / currentStatus.totalTasks) * 100) : 0;
     const barWidth = 20;
     const filled = Math.round((pct / 100) * barWidth);
@@ -1214,7 +1214,6 @@ Format your output cleanly.`;
       }
     }
   }
-}
 
 async function runStep4() {
   banner('STEP 4: FINAL CODE REVIEW & IMPACT CHECK');
