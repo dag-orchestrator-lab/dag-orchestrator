@@ -158,6 +158,9 @@ The DAG Orchestrator roadmap is designed around increasing IDE integration, mult
 
 ### 🟣 `v0.3.0` (Design Mode & Enterprise Multi-Package Routing)
 - [ ] **`dag design` (Double-Diamond Architecture Mode):** Divergent exploration engine generating 3 candidate architectural options, trade-off matrices, and formal `RFC.md` specs before entering the build pipeline.
+- [ ] **Automatic Vertical Feature Slicing (Epics $\to$ Mini-DAGs):** Deconstructs large epics into milestone slices (max 5–8 tasks per slice), executing sequential mini-DAGs with isolated contract scopes and JIT dependency handoffs.
+- [ ] **Smart Complexity Nudge:** Detects massive prompts in `dag code` (>10 estimated tasks) and prompts to run `dag design` first to establish clean vertical slices.
+- [ ] **Gate 3 (Human Acceptance & Live Verification Gate):** Pauses upon test completion for real human testing against live databases/servers, supporting incremental contract addendums (`02-contracts.addendum.md`) without invalidating baseline frozen contracts.
 - [ ] **Configurable Lifecycle Orchestrator (`dag run` vs `dag code`):**
   - `dag code <feature>`: Fast-path execution for concrete, well-defined requirements.
   - `dag design <vision>`: Exploratory mode for fuzzy architectural decisions.
