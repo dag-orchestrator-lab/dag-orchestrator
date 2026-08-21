@@ -99,8 +99,11 @@ dag init
 | `dag service [link\|list]` | Manage linked microservices & harvest SQL/OpenAPI/Postman schemas JIT |
 | `dag stats` | View token usage, cost benchmarks, and multi-model comparative net savings |
 | `dag status` | Visual terminal dashboard of all pipeline artifacts and active config |
-| `dag features` (or `list`) | List all feature workspaces and their completion status |
-| `dag switch <name>` | Switch active feature workspace context |
+| `dag features` (or `list`) | List active and paused feature workspaces in `features/` (Hot Tier) |
+| `dag archive [name]` | Park current feature workspace into `.dag/archive/<name>` (Cold Storage) |
+| `dag archive list` | List all archived features in cold storage |
+| `dag unarchive [name]` | Move a feature from cold storage (`.dag/archive/`) to `features/` (Hot Tier) |
+| `dag activate [name]` (or `switch`) | Switch active workspace to a feature in `features/` with Git branch safety |
 | `dag stack [base-branch]` | Fetch base/PR branch and create a clean stacked feature branch |
 | `dag config [preset]` | Manage providers, models, and API keys (built-ins & custom presets) |
 | `dag next` | Smart Pipeline Advancer: Automatically detects state & executes next stage |
@@ -110,7 +113,7 @@ dag init
 | `dag implement` (or `code`) | Step 3: Implement next task with tests-first TDD & auto-healing test loop |
 | `dag review` (or `audit`) | Step 4: Whole-repo impact check & produce `REVIEW.md` |
 | `dag run "<prompt>"` | Execute the entire pipeline end-to-end with interactive gate stops |
-| `dag ship [title]` | Bundle spec audit trail & open GitHub Pull Request |
+| `dag ship [title]` | Clean AI-synthesized Confluence PR generator, auto-branching, & auto-promotion |
 | `dag rollback <step>` | Safely rewind to a previous stage with automatic backup snapshot |
 | `dag clean` | Reset pipeline and backup all generated artifacts |
 

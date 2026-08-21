@@ -213,18 +213,44 @@ dag service
 
 ---
 
-## 8. Multi-Feature Workspaces & Branch Stacking (`dag stack`)
+## 8. Two-Tier Workspace Lifecycle & Branch Stacking
 
-### Working with Multiple Features:
-```bash
-# List all active and historical feature workspaces:
-dag features
+DAG uses a **Two-Tier Storage Architecture** to allow fluid context switching without cluttering your workspace or losing historical specs:
 
-# Switch between feature contexts:
-dag switch 2026-08-campaign-scheduler
+```
+[Cold Tier: .dag/archive/]  <==== dag unarchive ====   [Hot Tier: features/]   <==== dag activate ====   [Active: current-feature/]
+                            ====  dag archive   ====>                          ====  auto-park   ====>
 ```
 
-### Stacking Branches on Active PRs:
+### Hot Tier: Active & Paused Features (`features/`)
+```bash
+# List all active/paused feature workspaces in the features/ folder:
+dag features
+
+# Switch active workspace to an existing hot-tier feature:
+dag activate dynamic-campaign-live-dashboard
+# (or interactive menu: dag activate)
+```
+* **Git Branch Safety:** When activating a feature, DAG compares your current Git branch against the feature's recorded branch and prompts to switch automatically (`git checkout <branch>`).
+* **Drift Detection:** If the feature was on hiatus for over 24 hours, DAG alerts you and offers a quick recon refresh to detect breaking upstream changes.
+
+### Cold Tier: Archiving & Unarchiving (`.dag/archive/`)
+```bash
+# Park your current workspace into cold storage:
+dag archive my-feature-name
+
+# List all archived features:
+dag archive list
+
+# Unarchive / promote an archived feature back into features/ (Hot Tier):
+dag unarchive my-feature-name
+```
+
+### Automatic Post-Ship Promotion & Capacity Cap
+* Once `dag ship` opens or skips a PR, `current-feature/` is automatically promoted to `features/<feature-name>` with status `[SHIPPED]`, leaving `current-feature/` clean for your next `dag new`.
+* If your hot tier exceeds the capacity cap (`MAX_ACTIVE_FEATURES = 5`), DAG provides a 1-key triage menu to move older shipped or paused features to cold storage.
+
+### Branch Stacking on Active PRs:
 ```bash
 # Stack a new branch on top of PR 1651:
 dag stack pr-1651 feature/campaign-part-2
