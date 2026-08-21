@@ -335,25 +335,45 @@ async function runStep0(featureAsk, options = {}) {
 
   let existingContext = '';
 
-  // 1. Check for --file or --plan flag
-  const fileArg = process.argv.find(a => a.startsWith('--file=') || a.startsWith('--plan='));
-  const targetFile = fileArg ? fileArg.split('=')[1].trim() : (options.file || options.plan || '');
+  // 1. Check for --file or --plan flag (supports --file=path or --file path)
+  let targetFile = options.file || options.plan || '';
+  const fileIdx = process.argv.findIndex(a => a === '--file' || a === '--plan' || a === '-f');
+  if (fileIdx !== -1 && process.argv[fileIdx + 1] && !process.argv[fileIdx + 1].startsWith('-')) {
+    targetFile = process.argv[fileIdx + 1];
+  } else {
+    const fileArg = process.argv.find(a => a.startsWith('--file=') || a.startsWith('--plan='));
+    if (fileArg) targetFile = fileArg.split('=')[1].trim();
+  }
 
-  if (targetFile && fs.existsSync(targetFile)) {
-    try {
-      const fileContent = fs.readFileSync(targetFile, 'utf8').trim();
-      existingContext += `\n\n==================== PRE-EXISTING PLAN / RFC (${path.basename(targetFile)}) ====================\n${fileContent}\n================================================================================`;
-      logSuccess(`Ingested pre-existing architecture plan from ${targetFile}`);
-    } catch (e) {
-      logWarning(`Could not read plan file: ${e.message}`);
+  if (targetFile) {
+    const cleanTarget = targetFile.replace(/^["']|["']$/g, '');
+    const resolvedTarget = path.isAbsolute(cleanTarget) ? cleanTarget : path.resolve(process.cwd(), cleanTarget);
+    if (fs.existsSync(resolvedTarget)) {
+      try {
+        const fileContent = fs.readFileSync(resolvedTarget, 'utf8').trim();
+        existingContext += `\n\n==================== PRE-EXISTING PLAN / RFC (${path.basename(resolvedTarget)}) ====================\n${fileContent}\n================================================================================`;
+        logSuccess(`Ingested pre-existing architecture plan from ${resolvedTarget}`);
+      } catch (e) {
+        logWarning(`Could not read plan file: ${e.message}`);
+      }
+    } else {
+      logWarning(`Could not find specified file at: ${cleanTarget}`);
     }
   }
 
-  // 2. Check for inline --context flag
-  const contextArg = process.argv.find(a => a.startsWith('--context='));
-  if (contextArg) {
-    const rawCtx = contextArg.slice(10).replace(/^["']|["']$/g, '');
-    existingContext += `\n\n==================== USER ARCHITECTURAL CONSTRAINTS ====================\n${rawCtx}\n========================================================================`;
+  // 2. Check for inline --context flag (supports --context=val or --context val)
+  let rawCtx = '';
+  const ctxIdx = process.argv.findIndex(a => a === '--context' || a === '-c');
+  if (ctxIdx !== -1 && process.argv[ctxIdx + 1] && !process.argv[ctxIdx + 1].startsWith('-')) {
+    rawCtx = process.argv[ctxIdx + 1];
+  } else {
+    const contextArg = process.argv.find(a => a.startsWith('--context='));
+    if (contextArg) rawCtx = contextArg.slice(10);
+  }
+
+  if (rawCtx) {
+    const cleanCtx = rawCtx.replace(/^["']|["']$/g, '');
+    existingContext += `\n\n==================== USER ARCHITECTURAL CONSTRAINTS ====================\n${cleanCtx}\n========================================================================`;
     logSuccess('Loaded inline architectural constraints');
   }
 
