@@ -19,7 +19,7 @@ import { loadConfig } from '../config.js';
 
 export function getProviderForStage(stageName, customConfig = {}) {
   const config = { ...loadConfig(), ...customConfig };
-  const providerKey = `PROVIDER_${stageName.toUpperCase()}`;
+  const providerKey = stageName === 'code-review' ? 'PROVIDER_CODING' : `PROVIDER_${stageName.toUpperCase()}`;
   const providerName = config[providerKey] || config.DEFAULT_PROVIDER_PRESET || 'gemini';
 
   switch (providerName.toLowerCase()) {
