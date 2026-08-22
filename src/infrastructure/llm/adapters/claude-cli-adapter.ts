@@ -5,7 +5,7 @@ import type { LLMProviderPort } from '../../../domain/llm/ports/llm-provider-por
 import type { StageProviderConfig } from '../../../domain/llm/types/stage-provider-config.js';
 
 const DEFAULT_CLAUDE_CLI_PATH = 'claude';
-const DEFAULT_CLAUDE_CLI_TIMEOUT_MS = 120_000;
+const DEFAULT_CLAUDE_CLI_TIMEOUT_MS = 600_000;
 const CLAUDE_CLI_BASE_ARGS = ['--dangerously-skip-permissions'];
 
 /**
