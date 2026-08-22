@@ -252,12 +252,31 @@ export function cleanArtifacts(cwdOrSlug?: string): void {
 
 export function archiveFeatureWorkspace(destinationType: string = 'archive', featureName: string = '', customMeta: any = {}, cwd: string = process.cwd()): unknown {
   const currentSlug = resolveSlug(undefined);
-  const targetName = featureName || currentSlug;
+  let defaultName = 'current-feature';
+  const reqPath = path.join(cwd, '.dag/features', currentSlug, '00-requirements.md');
+  if (fs.existsSync(reqPath)) {
+    try {
+      const reqTxt = fs.readFileSync(reqPath, 'utf8');
+      const tMatch = reqTxt.match(/^#\s*([^\n]+)/m) || reqTxt.match(/Feature:\s*([^\n]+)/i);
+      if (tMatch && tMatch[1]) {
+        defaultName = tMatch[1].replace(/^(Feature\s*Request|Feature\s*Goal|Requirements|Feature):\s*/i, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+      }
+    } catch (e) {}
+  }
+  const targetName = featureName || defaultName;
   try { unwrapOrThrow(service.archiveFeatureWorkspace(currentSlug)); } catch(e){}
+  
   const specsDir = '.dag/features';
   const currentDir = path.join(cwd, specsDir, currentSlug);
-  const targetDir = path.join(cwd, '.dag', destinationType, targetName);
-  if (fs.existsSync(currentDir)) {
+  let targetDir;
+  
+  if (destinationType === 'archive') {
+    targetDir = path.join(cwd, '.dag', 'archive', targetName);
+  } else {
+    targetDir = path.join(cwd, specsDir, targetName);
+  }
+  
+  if (fs.existsSync(currentDir) && currentDir !== targetDir) {
     fs.mkdirSync(path.dirname(targetDir), { recursive: true });
     fs.renameSync(currentDir, targetDir);
     const metaPath = path.join(targetDir, 'meta.json');
@@ -284,16 +303,17 @@ export function unarchiveFeatureWorkspace(featureName: string, cwd: string = pro
 
 export function activateFeatureWorkspace(featureName: string, cwd: string = process.cwd()): unknown {
   try { unwrapOrThrow(service.activateFeatureWorkspace(featureName)); } catch(e){}
+  
   const currentSlug = resolveSlug(undefined);
   const hotDir = path.join(cwd, '.dag', 'features');
+  
   if (currentSlug && currentSlug !== featureName) {
-    const fromPath = path.join(hotDir, currentSlug);
-    const toPath = path.join(cwd, '.dag', 'archive', currentSlug);
-    if (fs.existsSync(fromPath)) {
-      fs.mkdirSync(path.dirname(toPath), { recursive: true });
-      fs.renameSync(fromPath, toPath);
+    const currentDir = path.join(hotDir, currentSlug);
+    if (fs.existsSync(currentDir)) {
+      archiveFeatureWorkspace('named_feature', '', {}, cwd);
     }
   }
+  
   const sourceDir = path.join(hotDir, featureName);
   const targetDir = path.join(hotDir, 'current-feature');
   if (fs.existsSync(sourceDir)) {
