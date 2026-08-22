@@ -82,11 +82,11 @@ export function verifyContractSpec(contractText, findingsText = '', rulesText = 
   };
 }
 
-export function verifyTaskList(tasksText, contractText = '') {
+export function verifyTaskList(tasksText, _contractText = '') {
   const checks = [];
 
-  // Check 1: Atomic task breakdown (supports ### T-1, ### Task 1, - [ ] Task 1, ## T-1, etc.)
-  const taskMatches = tasksText.match(/###?\s+(T-\d+|Task\s+\d+)|\- \[[ x]\]\s+(Task|T-)\s*\d+/gi) || [];
+  // Check 1: Atomic task breakdown (supports ### T-1, ### [ ] T-1, ### Task 1, - [ ] Task 1, ## T-1, etc.)
+  const taskMatches = tasksText.match(/###?\s+(?:\[[ x]\]\s*)?(T-\d+|Task\s+\d+)|- \[[ x]\]\s+(Task|T-)\s*\d+/gi) || [];
   const hasTasks = taskMatches.length > 0;
   checks.push({
     name: 'Atomic Task Breakdown',
@@ -95,7 +95,7 @@ export function verifyTaskList(tasksText, contractText = '') {
   });
 
   // Check 2: Verification / Test Check Commands (Check: or command code blocks)
-  const hasCheckCommands = /(Check:|Test:|Validation:)\s+[\w\.\/\-\`]+/i.test(tasksText) || /```(bash|sh|cmd)[\s\S]*?```/i.test(tasksText);
+  const hasCheckCommands = /(Check:|Test:|Validation:)\s+[\w./\-`]+/i.test(tasksText) || /```(bash|sh|cmd)[\s\S]*?```/i.test(tasksText);
   checks.push({
     name: 'Automated Test & Check Commands',
     pass: hasCheckCommands,
@@ -103,7 +103,7 @@ export function verifyTaskList(tasksText, contractText = '') {
   });
 
   // Check 3: File path scoping (Files: or File: or targets or none/inline files)
-  const hasFileScopes = /(Files|File|Targets|Target):\s+/i.test(tasksText) || /`[\w\.\/\-]+\.(ts|js|sql|json|tsx|jsx)`/i.test(tasksText);
+  const hasFileScopes = /(Files|File|Targets|Target):\s+/i.test(tasksText) || /`[\w./-]+\.(ts|js|sql|json|tsx|jsx)`/i.test(tasksText);
   checks.push({
     name: 'File Modification Scoping',
     pass: hasFileScopes,
@@ -155,7 +155,7 @@ export function renderVerificationReport(report) {
   console.log(`${ANSI.cyan}${ANSI.bold}└${line}┘${ANSI.reset}\n`);
 }
 
-export function verifyFullPipeline(status, cwd = process.cwd()) {
+export function verifyFullPipeline(status, _cwd = process.cwd()) {
   const reports = [];
 
   // Check 02-contracts.md if present
