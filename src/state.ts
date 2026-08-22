@@ -95,12 +95,53 @@ export function resolveArtifactPath(cwdOrSlug: string | undefined, artifactName:
   return unwrapOrThrow(service.resolveArtifactPath(resolveSlug(cwdOrSlug), artifactName));
 }
 
+
 export function listAllFeatures(cwdOrSlug?: string): unknown[] {
-  return unwrapOrThrow(service.listAllFeatures());
+  const cwd = process.cwd();
+  const configPath = path.join(cwd, '.dag', 'config.json');
+  let config: any = {};
+  if (fs.existsSync(configPath)) {
+    try { config = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch(e){}
+  }
+  const specsDir = config.SPECS_DIR || '.dag/features';
+  const featuresDir = path.join(cwd, specsDir);
+  const results: any[] = [];
+  if (fs.existsSync(featuresDir)) {
+    for (const item of fs.readdirSync(featuresDir)) {
+      const full = path.join(featuresDir, item);
+      if (fs.statSync(full).isDirectory() && fs.existsSync(path.join(full, '00-requirements.md'))) {
+        results.push({
+          slug: item, name: item,
+          dir: full,
+          isCurrent: resolveSlug(cwdOrSlug) === item,
+          hasContract: fs.existsSync(path.join(full, '02-contracts.md')),
+          hasReview: fs.existsSync(path.join(full, 'REVIEW.md'))
+        });
+      }
+    }
+  }
+  return results;
 }
 
 export function listArchivedFeatures(cwdOrSlug?: string): unknown[] {
-  return unwrapOrThrow(service.listArchivedFeatures());
+  const cwd = process.cwd();
+  const archivesDir = path.join(cwd, '.dag', 'archive');
+  const results: any[] = [];
+  if (fs.existsSync(archivesDir)) {
+    for (const item of fs.readdirSync(archivesDir)) {
+      const full = path.join(archivesDir, item);
+      if (fs.statSync(full).isDirectory() && fs.existsSync(path.join(full, '00-requirements.md'))) {
+        results.push({
+          slug: item, name: item,
+          dir: full,
+          isCurrent: false,
+          hasContract: fs.existsSync(path.join(full, '02-contracts.md')),
+          hasReview: fs.existsSync(path.join(full, 'REVIEW.md'))
+        });
+      }
+    }
+  }
+  return results;
 }
 
 export function recordGateApproval(cwdOrSlug: string | undefined, gate: string, approval: unknown): void {

@@ -1693,7 +1693,7 @@ async function main() {
               const res = applyRulePreset(presetArgs);
               logSuccess(`Applied "${res.preset}" preset(s) to .dagrules! (${res.count} rules added)\n`);
             } catch (err) {
-              logError(err.message);
+              console.error(err);
             }
           }
         } else if (rulesSubCmd === 'sync') {
@@ -2054,7 +2054,7 @@ async function main() {
               const chosen = setHarnessRunner(key);
               logSuccess(`Switched execution harness to: "${chosen}"`);
             } catch (err) {
-              logError(err.message);
+              console.error(err);
             }
           }
         } else if (subCmd === 'set' && key && val) {
@@ -2627,7 +2627,7 @@ ${ANSI.dim}Run \`dag help <command>\` for detailed command guidance (e.g. \`dag 
         break;
     }
   } catch (err) {
-    logError(err.message);
+    console.error(err);
   } finally {
     rl.close();
   }

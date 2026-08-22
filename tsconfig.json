@@ -15,5 +15,5 @@
     "skipLibCheck": true,
     "isolatedModules": true
   },
-  "include": ["src/domain/**/*.ts", "src/infrastructure/**/*.ts"]
+  "include": ["src/domain/**/*.ts", "src/infrastructure/**/*.ts", "src/application/**/*.ts", "src/state.ts"]
 }
