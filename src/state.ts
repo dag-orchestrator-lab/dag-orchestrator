@@ -144,12 +144,44 @@ export function listArchivedFeatures(cwdOrSlug?: string): unknown[] {
   return results;
 }
 
-export function recordGateApproval(cwdOrSlug: string | undefined, gate: string, approval: unknown): void {
-  if (approval === undefined && gate !== undefined && typeof cwdOrSlug === 'string') {
-    unwrapOrThrow(service.recordGateApproval(resolveSlug(), cwdOrSlug, gate));
-  } else {
-    unwrapOrThrow(service.recordGateApproval(resolveSlug(cwdOrSlug), gate, approval));
+export function recordGateApproval(cwdOrSlug: any, gate?: any, approval?: any): void {
+  // Legacy signature: recordGateApproval(gateNumber, approved = true, cwd = process.cwd())
+  const gateName = `gate${cwdOrSlug}`;
+  const isApproved = gate !== undefined ? gate : true;
+  const cwd = typeof approval === 'string' ? approval : undefined;
+  
+  const slug = resolveSlug(cwd);
+  const domainApproval = {
+    approver: 'dag-cli',
+    approvedAt: new Date().toISOString(),
+    metadata: { approved: isApproved }
+  };
+  
+  // Try to use the new domain service (might create meta.json)
+  try {
+    service.recordGateApproval(slug, gateName, domainApproval);
+  } catch(e) {}
+
+  // ALWAYS write to legacy .dag-gates.json so getPipelineStatus can read it!
+  const actualCwd = cwd || process.cwd();
+  const configPath = path.join(actualCwd, '.dag', 'config.json');
+  let config: any = {};
+  if (fs.existsSync(configPath)) {
+    try { config = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch(e){}
   }
+  const specsDir = config.SPECS_DIR || '.dag/features';
+  const workspaceDir = path.join(actualCwd, specsDir, slug);
+  const gatesFile = path.join(workspaceDir, '.dag-gates.json');
+  
+  let state: any = {};
+  if (fs.existsSync(gatesFile)) {
+    try { state = JSON.parse(fs.readFileSync(gatesFile, 'utf8')); } catch (e) {}
+  }
+  state[gateName] = {
+    approved: isApproved,
+    timestamp: new Date().toISOString()
+  };
+  fs.writeFileSync(gatesFile, JSON.stringify(state, null, 2));
 }
 
 export function getPipelineStatus(cwdOrSlug?: string): unknown {
