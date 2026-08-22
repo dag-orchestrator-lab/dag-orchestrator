@@ -1491,13 +1491,18 @@ async function runShip(args = []) {
     ghInstalled = true;
   } catch (e) {}
 
+  let currentBranch = '';
+  try {
+    currentBranch = execSync('git branch --show-current', { encoding: 'utf8', cwd: process.cwd() }).trim();
+  } catch (e) {}
+  let baseBranch = config.STACKED_BASE_BRANCH || 'develop';
+
   if (ghInstalled) {
-    const createPR = await askQuestion('\n👉 Open Pull Request on GitHub now (`gh pr create`)? [Y/n] (Default: Y): ');
-    if (!createPR.trim() || createPR.toLowerCase() === 'y' || createPR.toLowerCase() === 'yes') {
-      // Derive smart PR title matching <Prefix>/<Ticket Number on Jira> - <Title> (Confluence standard)
+    const doPr = await askQuestion(`\n👉 Do you want to automatically create a GitHub Pull Request using \`gh\`? [Y/n]: `);
+    if (doPr.trim().toLowerCase() !== 'n') {
       let branchName = '';
       try {
-        branchName = execSync('git branch --show-current', { encoding: 'utf8', cwd: process.cwd() }).trim();
+        branchName = currentBranch;
       } catch (e) {}
 
       const ticketMatch = branchName.match(/(?:feat|fix|chore|hotfix)\/([A-Z]+-\d+)/i) || branchName.match(/([A-Z]+-\d+)/i);
@@ -1510,11 +1515,6 @@ async function runShip(args = []) {
       console.log(`\n💡 Suggested PR Title: ${ANSI.bold}${ANSI.cyan}${defaultPrTitle}${ANSI.reset}`);
       const userPrTitle = await askQuestion(`👉 Enter Pull Request Title (Press Enter to accept suggestion): `);
       const prTitle = userPrTitle.trim() || defaultPrTitle;
-
-      let currentBranch = '';
-      try {
-        currentBranch = execSync('git branch --show-current', { encoding: 'utf8', cwd: process.cwd() }).trim();
-      } catch (e) {}
 
       // Check if user is currently on the default/trunk branch (e.g. develop, main, master)
       const trunkBranches = ['develop', 'main', 'master', 'staging', 'uat'];
@@ -1544,7 +1544,7 @@ async function runShip(args = []) {
       const defaultBaseBranch = config.STACKED_BASE_BRANCH || 'develop';
       console.log(`\n🎯 Target Base Branch: ${ANSI.bold}${ANSI.green}${defaultBaseBranch}${ANSI.reset}`);
       const userBaseAnswer = await askQuestion(`👉 Enter target base branch (Press Enter for '${defaultBaseBranch}'): `);
-      const baseBranch = userBaseAnswer.trim() || defaultBaseBranch;
+      baseBranch = userBaseAnswer.trim() || defaultBaseBranch;
 
       try {
         logStep(`Creating GitHub Pull Request (${currentBranch} ➔ ${baseBranch})...`, 'GitHub CLI', 'gh pr create');
