@@ -107,13 +107,13 @@ Rules:
  * Step 3: Implement Next Atomic Task
  */
 export async function claudeImplementTask(taskText, contractText, cwd) {
-  const prompt = `You are implementing the atomic tasks defined in 05-tasks.md:
-
-Task Specification:
-${taskText}
+  const prompt = `You are implementing the atomic tasks defined in 05-tasks.md.
 
 Reference Contract (02-contracts.md):
 ${contractText}
+
+Task Specification:
+${taskText}
 
 Instructions:
 1. You MUST use your file editing/writing tools to implement the required code changes directly in the workspace files specified in "Files:".

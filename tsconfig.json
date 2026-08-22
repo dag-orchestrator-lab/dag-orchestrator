@@ -4,6 +4,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "lib": ["ES2022"],
+    "types": ["node"],
     "rootDir": "src",
     "outDir": "dist",
     "declaration": true,
@@ -14,5 +15,5 @@
     "skipLibCheck": true,
     "isolatedModules": true
   },
-  "include": ["src/domain/**/*.ts"]
+  "include": ["src/domain/**/*.ts", "src/infrastructure/**/*.ts"]
 }
