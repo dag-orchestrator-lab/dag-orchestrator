@@ -250,14 +250,55 @@ export function cleanArtifacts(cwdOrSlug?: string): void {
   unwrapOrThrow(service.cleanArtifacts(resolveSlug(cwdOrSlug)));
 }
 
-export function archiveFeatureWorkspace(cwdOrSlug?: string): void {
-  unwrapOrThrow(service.archiveFeatureWorkspace(resolveSlug(cwdOrSlug)));
+export function archiveFeatureWorkspace(destinationType: string = 'archive', featureName: string = '', customMeta: any = {}, cwd: string = process.cwd()): unknown {
+  const currentSlug = resolveSlug(undefined);
+  const targetName = featureName || currentSlug;
+  try { unwrapOrThrow(service.archiveFeatureWorkspace(currentSlug)); } catch(e){}
+  const specsDir = '.dag/features';
+  const currentDir = path.join(cwd, specsDir, currentSlug);
+  const targetDir = path.join(cwd, '.dag', destinationType, targetName);
+  if (fs.existsSync(currentDir)) {
+    fs.mkdirSync(path.dirname(targetDir), { recursive: true });
+    fs.renameSync(currentDir, targetDir);
+    const metaPath = path.join(targetDir, 'meta.json');
+    let meta = {};
+    if (fs.existsSync(metaPath)) { try { meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')); } catch(e){} }
+    meta = { ...meta, ...customMeta };
+    fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2));
+  }
+  return { success: true, targetDir };
 }
 
-export function unarchiveFeatureWorkspace(cwdOrSlug?: string): void {
-  unwrapOrThrow(service.unarchiveFeatureWorkspace(resolveSlug(cwdOrSlug)));
+export function unarchiveFeatureWorkspace(featureName: string, cwd: string = process.cwd()): unknown {
+  const cleanName = featureName;
+  try { unwrapOrThrow(service.unarchiveFeatureWorkspace(cleanName)); } catch(e){}
+  const sourceDir = path.join(cwd, '.dag', 'archive', cleanName);
+  const targetDir = path.join(cwd, '.dag', 'features', cleanName);
+  if (fs.existsSync(sourceDir)) {
+    fs.mkdirSync(path.dirname(targetDir), { recursive: true });
+    fs.renameSync(sourceDir, targetDir);
+    return { success: true, targetDir };
+  }
+  return { success: false, message: 'Not found' };
 }
 
-export function activateFeatureWorkspace(cwdOrSlug?: string): void {
-  unwrapOrThrow(service.activateFeatureWorkspace(resolveSlug(cwdOrSlug)));
+export function activateFeatureWorkspace(featureName: string, cwd: string = process.cwd()): unknown {
+  try { unwrapOrThrow(service.activateFeatureWorkspace(featureName)); } catch(e){}
+  const currentSlug = resolveSlug(undefined);
+  const hotDir = path.join(cwd, '.dag', 'features');
+  if (currentSlug && currentSlug !== featureName) {
+    const fromPath = path.join(hotDir, currentSlug);
+    const toPath = path.join(cwd, '.dag', 'archive', currentSlug);
+    if (fs.existsSync(fromPath)) {
+      fs.mkdirSync(path.dirname(toPath), { recursive: true });
+      fs.renameSync(fromPath, toPath);
+    }
+  }
+  const sourceDir = path.join(hotDir, featureName);
+  const targetDir = path.join(hotDir, 'current-feature');
+  if (fs.existsSync(sourceDir)) {
+    fs.renameSync(sourceDir, targetDir);
+    return { success: true, targetDir };
+  }
+  return { success: false, message: 'Not found' };
 }
