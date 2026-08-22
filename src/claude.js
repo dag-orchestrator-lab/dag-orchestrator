@@ -118,7 +118,7 @@ ${contractText}
 Instructions:
 1. You MUST use your file editing/writing tools to implement the required code changes directly in the workspace files specified in "Files:".
 2. Follow TDD: Implement the unit/verification tests first and run the verification command ("Check:").
-3. CRITICAL: Implement EXACTLY the active task block and nothing more. DO NOT implement methods or features belonging to future tasks. If you create a class but a method is not explicitly required in this task, leave it as a `// TODO` to prevent diff overlap with future tasks.
+3. CRITICAL: Implement EXACTLY the active task block and nothing more. DO NOT implement methods or features belonging to future tasks. If you create a class but a method is not explicitly required in this task, leave it as a \`// TODO\` to prevent diff overlap with future tasks.
 4. Do NOT just print the code in your response — you MUST write and save the changes to the disk.
 5. Verify that all changes compile, pass typechecking, and satisfy the check commands.`;
 
