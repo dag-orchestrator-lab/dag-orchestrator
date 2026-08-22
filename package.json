@@ -10,9 +10,11 @@
   "scripts": {
     "dag": "node bin/dag.js",
     "dsh": "npx @deepseek-ai/dsh web",
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
   },
   "devDependencies": {
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
   }
 }

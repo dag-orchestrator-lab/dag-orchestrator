@@ -290,10 +290,11 @@ You are evaluating the PROGRESS of atomic task implementation.
 
 CRITICAL RULES:
 1. Scope your audit ONLY to tasks that are marked [x] / completed in 05-tasks.md, or files present in the GIT DIFF.
-2. DO NOT flag upcoming, pending, or unstarted tasks as "drift" or "unsatisfied". They are expected to be pending until their turn in the pipeline.
-3. Only report ACTUAL drift:
+2. DO NOT flag upcoming, pending, or unstarted tasks as "drift" or "unsatisfied".
+3. Overlap Grace: If an active task specifies modifying a file, but that file is MISSING from the git diff, ASSUME it was already implemented in a previous task by an over-achieving agent. Do NOT flag this as plan drift.
+4. Only report ACTUAL drift:
    - Contract Drift: If modified code contradicts the technical contract interface.
-   - Plan Drift: If a task marked [x] is missing from the diff, or if the diff contains completely unrelated modified files.
+   - Plan Drift: If the diff contains completely unrelated modified files not in the plan.
    - Operational Checklist: Security, SQL safety, transaction boundaries in the modified lines.
 
 If the current diff satisfies the implemented tasks with zero violations, simply respond: "✅ All active tasks in diff conform strictly to contracts. No drift detected."`;
