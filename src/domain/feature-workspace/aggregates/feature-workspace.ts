@@ -1,5 +1,5 @@
 import { Result } from '../../common/result.js';
-import { DomainError } from '../../common/errors.js';
+import { WorkspaceResultError } from '../../common/errors.js';
 import { FeatureSlug } from '../value-objects/feature-slug.js';
 import { GateApproval } from '../value-objects/gate-approval.js';
 import { RollbackSnapshot } from '../value-objects/rollback-snapshot.js';
@@ -71,7 +71,7 @@ export class FeatureWorkspace {
   /**
    * Mutates context metadata. Guarantees atomic, valid state replace.
    */
-  public saveContextMeta(meta: Record<string, unknown>): Result<void, DomainError> {
+  public saveContextMeta(meta: Record<string, unknown>): Result<void, WorkspaceResultError> {
     if (!meta || typeof meta !== 'object' || Array.isArray(meta)) {
       return Result.err({
         kind: 'ValidationError',
@@ -86,7 +86,7 @@ export class FeatureWorkspace {
   /**
    * Records a gate approval. Appends or replaces approval for the specified gate.
    */
-  public recordGateApproval(approval: GateApproval): Result<void, DomainError> {
+  public recordGateApproval(approval: GateApproval): Result<void, WorkspaceResultError> {
     const existingIndex = this._approvals.findIndex((a) => a.gateName === approval.gateName);
     if (existingIndex >= 0) {
       this._approvals[existingIndex] = approval;
@@ -100,7 +100,7 @@ export class FeatureWorkspace {
    * Archives active workspace.
    * Invariant: Mutual exclusivity - workspace cannot be active and archived simultaneously.
    */
-  public archive(): Result<void, DomainError> {
+  public archive(): Result<void, WorkspaceResultError> {
     if (this._status.isArchived()) {
       return Result.ok(undefined);
     }
@@ -111,7 +111,7 @@ export class FeatureWorkspace {
   /**
    * Unarchives an archived workspace.
    */
-  public unarchive(): Result<void, DomainError> {
+  public unarchive(): Result<void, WorkspaceResultError> {
     if (this._status.isActive()) {
       return Result.ok(undefined);
     }
@@ -122,7 +122,7 @@ export class FeatureWorkspace {
   /**
    * Explicitly activates a feature workspace.
    */
-  public activate(): Result<void, DomainError> {
+  public activate(): Result<void, WorkspaceResultError> {
     this._status = WorkspaceStatus.ACTIVE;
     return Result.ok(undefined);
   }
@@ -130,7 +130,7 @@ export class FeatureWorkspace {
   /**
    * Cleans artifacts tracking list in domain model.
    */
-  public cleanArtifacts(): Result<string[], DomainError> {
+  public cleanArtifacts(): Result<string[], WorkspaceResultError> {
     const removed = [...this._artifacts];
     this._artifacts = [];
     return Result.ok(removed);
@@ -139,7 +139,7 @@ export class FeatureWorkspace {
   /**
    * Generates a RollbackSnapshot from current aggregate state.
    */
-  public createRollbackSnapshot(): Result<RollbackSnapshot, DomainError> {
+  public createRollbackSnapshot(): Result<RollbackSnapshot, WorkspaceResultError> {
     const snapshotId = `snapshot-${Date.now()}`;
     return RollbackSnapshot.create({
       snapshotId,

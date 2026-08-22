@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Result } from './domain/common/result.js';
-import { DomainError } from './domain/common/errors.js';
+import { WorkspaceResultError } from './domain/common/errors.js';
 import { FeatureWorkspaceService } from './application/feature-workspace-service.js';
 import { FileSystemFeatureWorkspaceRepository } from './infrastructure/file-system-repository.js';
 import { resolveConfiguration } from './infrastructure/config.js';
@@ -11,7 +11,7 @@ const SLUG_MAX_LENGTH = 50;
 const repository = new FileSystemFeatureWorkspaceRepository(resolveConfiguration());
 const service = new FeatureWorkspaceService(repository);
 
-function formatDomainError(error: DomainError): string {
+function formatWorkspaceResultError(error: WorkspaceResultError): string {
   switch (error.kind) {
     case 'PersistenceReadError':
       return `Failed to read state at ${error.path}: ${String(error.cause)}`;
@@ -24,12 +24,12 @@ function formatDomainError(error: DomainError): string {
   }
 }
 
-function unwrapOrThrow<T>(result: Result<T, DomainError>, notFoundFallback?: T): T {
+function unwrapOrThrow<T>(result: Result<T, WorkspaceResultError>, notFoundFallback?: T): T {
   if (result.isOk) return result.value;
   if (result.error.kind === 'NotFoundError' && notFoundFallback !== undefined) {
     return notFoundFallback;
   }
-  throw new Error(formatDomainError(result.error));
+  throw new Error(formatWorkspaceResultError(result.error));
 }
 
 export function slugify(input: string): string {
@@ -57,7 +57,7 @@ function resolveSlug(cwdOrSlug?: string): string {
       if (config.ACTIVE_FEATURE) {
         return config.ACTIVE_FEATURE;
       }
-    } catch (e) {}
+    } catch {}
   }
 
   const featuresDir = path.join(cwd, '.dag', 'features');
@@ -97,11 +97,11 @@ export function resolveArtifactPath(cwdOrSlug: string | undefined, artifactName:
 
 
 export function listAllFeatures(cwdOrSlug?: string): unknown[] {
-  const cwd = process.cwd();
+  const cwd = process.env.DAG_WORKSPACE_ROOT || process.cwd();
   const configPath = path.join(cwd, '.dag', 'config.json');
   let config: any = {};
   if (fs.existsSync(configPath)) {
-    try { config = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch(e){}
+    try { config = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch {}
   }
   const specsDir = config.SPECS_DIR || '.dag/features';
   const featuresDir = path.join(cwd, specsDir);
@@ -123,8 +123,8 @@ export function listAllFeatures(cwdOrSlug?: string): unknown[] {
   return results;
 }
 
-export function listArchivedFeatures(cwdOrSlug?: string): unknown[] {
-  const cwd = process.cwd();
+export function listArchivedFeatures(_cwdOrSlug?: string): unknown[] {
+  const cwd = process.env.DAG_WORKSPACE_ROOT || process.cwd();
   const archivesDir = path.join(cwd, '.dag', 'archive');
   const results: any[] = [];
   if (fs.existsSync(archivesDir)) {
@@ -160,14 +160,14 @@ export function recordGateApproval(cwdOrSlug: any, gate?: any, approval?: any): 
   // Try to use the new domain service (might create meta.json)
   try {
     service.recordGateApproval(slug, gateName, domainApproval);
-  } catch(e) {}
+  } catch {}
 
   // ALWAYS write to legacy .dag-gates.json so getPipelineStatus can read it!
   const actualCwd = cwd || process.cwd();
   const configPath = path.join(actualCwd, '.dag', 'config.json');
   let config: any = {};
   if (fs.existsSync(configPath)) {
-    try { config = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch(e){}
+    try { config = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch {}
   }
   const specsDir = config.SPECS_DIR || '.dag/features';
   const workspaceDir = path.join(actualCwd, specsDir, slug);
@@ -175,7 +175,7 @@ export function recordGateApproval(cwdOrSlug: any, gate?: any, approval?: any): 
   
   let state: any = {};
   if (fs.existsSync(gatesFile)) {
-    try { state = JSON.parse(fs.readFileSync(gatesFile, 'utf8')); } catch (e) {}
+    try { state = JSON.parse(fs.readFileSync(gatesFile, 'utf8')); } catch {}
   }
   state[gateName] = {
     approved: isApproved,
@@ -186,11 +186,11 @@ export function recordGateApproval(cwdOrSlug: any, gate?: any, approval?: any): 
 
 export function getPipelineStatus(cwdOrSlug?: string): unknown {
   const slug = resolveSlug(cwdOrSlug);
-  const cwd = process.cwd();
+  const cwd = process.env.DAG_WORKSPACE_ROOT || process.cwd();
   const configPath = path.join(cwd, '.dag', 'config.json');
   let config: Record<string, string> = {};
   if (fs.existsSync(configPath)) {
-    try { config = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch(e){}
+    try { config = JSON.parse(fs.readFileSync(configPath, 'utf8')); } catch {}
   }
   const specsDir = config.SPECS_DIR || '.dag/features';
   const workspaceDir = path.join(cwd, specsDir, slug);
@@ -203,7 +203,7 @@ export function getPipelineStatus(cwdOrSlug?: string): unknown {
     : path.join(cwd, '.dag-gates.json');
 
   if (fs.existsSync(gatesPath)) {
-    try { gates = JSON.parse(fs.readFileSync(gatesPath, 'utf8')); } catch(e){}
+    try { gates = JSON.parse(fs.readFileSync(gatesPath, 'utf8')); } catch {}
   }
 
   let implementedCount = 0;
@@ -220,7 +220,7 @@ export function getPipelineStatus(cwdOrSlug?: string): unknown {
           implementedCount++;
         }
       }
-    } catch(e){}
+    } catch {}
   }
 
   return {
@@ -261,10 +261,10 @@ export function archiveFeatureWorkspace(destinationType: string = 'archive', fea
       if (tMatch && tMatch[1]) {
         defaultName = tMatch[1].replace(/^(Feature\s*Request|Feature\s*Goal|Requirements|Feature):\s*/i, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
       }
-    } catch (e) {}
+    } catch {}
   }
   const targetName = featureName || defaultName;
-  try { unwrapOrThrow(service.archiveFeatureWorkspace(currentSlug)); } catch(e){}
+  try { unwrapOrThrow(service.archiveFeatureWorkspace(currentSlug)); } catch {}
   
   const specsDir = '.dag/features';
   const currentDir = path.join(cwd, specsDir, currentSlug);
@@ -281,7 +281,7 @@ export function archiveFeatureWorkspace(destinationType: string = 'archive', fea
     fs.renameSync(currentDir, targetDir);
     const metaPath = path.join(targetDir, 'meta.json');
     let meta = {};
-    if (fs.existsSync(metaPath)) { try { meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')); } catch(e){} }
+    if (fs.existsSync(metaPath)) { try { meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')); } catch {} }
     meta = { ...meta, ...customMeta };
     fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2));
   }
@@ -290,7 +290,7 @@ export function archiveFeatureWorkspace(destinationType: string = 'archive', fea
 
 export function unarchiveFeatureWorkspace(featureName: string, cwd: string = process.cwd()): unknown {
   const cleanName = featureName;
-  try { unwrapOrThrow(service.unarchiveFeatureWorkspace(cleanName)); } catch(e){}
+  try { unwrapOrThrow(service.unarchiveFeatureWorkspace(cleanName)); } catch {}
   const sourceDir = path.join(cwd, '.dag', 'archive', cleanName);
   const targetDir = path.join(cwd, '.dag', 'features', cleanName);
   if (fs.existsSync(sourceDir)) {
@@ -302,7 +302,7 @@ export function unarchiveFeatureWorkspace(featureName: string, cwd: string = pro
 }
 
 export function activateFeatureWorkspace(featureName: string, cwd: string = process.cwd()): unknown {
-  try { unwrapOrThrow(service.activateFeatureWorkspace(featureName)); } catch(e){}
+  try { unwrapOrThrow(service.activateFeatureWorkspace(featureName)); } catch {}
   
   const currentSlug = resolveSlug(undefined);
   const hotDir = path.join(cwd, '.dag', 'features');

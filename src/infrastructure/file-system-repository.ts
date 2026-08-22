@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Result } from '../domain/common/result.js';
-import { DomainError } from '../domain/common/errors.js';
+import { WorkspaceResultError } from '../domain/common/errors.js';
 import { FeatureWorkspaceRepository } from '../domain/feature-workspace/ports/feature-workspace-repository.js';
 import { FeatureWorkspace } from '../domain/feature-workspace/aggregates/feature-workspace.js';
 import { RollbackSnapshot } from '../domain/feature-workspace/value-objects/rollback-snapshot.js';
@@ -24,23 +24,23 @@ export class FileSystemFeatureWorkspaceRepository implements FeatureWorkspaceRep
     return path.join(this.getWorkspaceDir(slug), artifactName);
   }
 
-  public findBySlug(slug: string): Result<FeatureWorkspace, DomainError> {
+  public findBySlug(slug: string): Result<FeatureWorkspace, WorkspaceResultError> {
     return this.readWorkspace(slug, this.getWorkspaceDir(slug), false);
   }
 
-  public findArchivedBySlug(slug: string): Result<FeatureWorkspace, DomainError> {
+  public findArchivedBySlug(slug: string): Result<FeatureWorkspace, WorkspaceResultError> {
     return this.readWorkspace(slug, path.join(this.config.archivedDir, slug), true);
   }
 
-  public findAll(): Result<FeatureWorkspace[], DomainError> {
+  public findAll(): Result<FeatureWorkspace[], WorkspaceResultError> {
     return this.readWorkspacesFromDir(this.config.featuresDir, false);
   }
 
-  public findAllArchived(): Result<FeatureWorkspace[], DomainError> {
+  public findAllArchived(): Result<FeatureWorkspace[], WorkspaceResultError> {
     return this.readWorkspacesFromDir(this.config.archivedDir, true);
   }
 
-  public save(workspace: FeatureWorkspace): Result<void, DomainError> {
+  public save(workspace: FeatureWorkspace): Result<void, WorkspaceResultError> {
     const dir = workspace.status.isArchived()
       ? path.join(this.config.archivedDir, workspace.slug.value)
       : this.getWorkspaceDir(workspace.slug.value);
@@ -59,7 +59,7 @@ export class FileSystemFeatureWorkspaceRepository implements FeatureWorkspaceRep
     }
   }
 
-  public moveToArchived(workspace: FeatureWorkspace): Result<void, DomainError> {
+  public moveToArchived(workspace: FeatureWorkspace): Result<void, WorkspaceResultError> {
     const sourceDir = this.getWorkspaceDir(workspace.slug.value);
     const targetDir = path.join(this.config.archivedDir, workspace.slug.value);
 
@@ -75,7 +75,7 @@ export class FileSystemFeatureWorkspaceRepository implements FeatureWorkspaceRep
     }
   }
 
-  public moveToActive(workspace: FeatureWorkspace): Result<void, DomainError> {
+  public moveToActive(workspace: FeatureWorkspace): Result<void, WorkspaceResultError> {
     const sourceDir = path.join(this.config.archivedDir, workspace.slug.value);
     const targetDir = this.getWorkspaceDir(workspace.slug.value);
 
@@ -91,7 +91,7 @@ export class FileSystemFeatureWorkspaceRepository implements FeatureWorkspaceRep
     }
   }
 
-  public saveSnapshot(slug: string, snapshot: RollbackSnapshot): Result<void, DomainError> {
+  public saveSnapshot(slug: string, snapshot: RollbackSnapshot): Result<void, WorkspaceResultError> {
     const snapshotDir = path.join(this.getWorkspaceDir(slug), SNAPSHOTS_DIR_NAME);
     const snapshotPath = path.join(snapshotDir, `${snapshot.snapshotId}.json`);
 
@@ -104,7 +104,7 @@ export class FileSystemFeatureWorkspaceRepository implements FeatureWorkspaceRep
     }
   }
 
-  public cleanArtifacts(slug: string): Result<void, DomainError> {
+  public cleanArtifacts(slug: string): Result<void, WorkspaceResultError> {
     const dir = this.getWorkspaceDir(slug);
     try {
       const files = ['00-requirements.md', '01-recon.md', '02-contracts.md', '03-domain.md', '03-app-infra.md', '03-data.md', '04-findings.md', '04-layer-findings.md', '05-tasks.md'];
@@ -118,7 +118,7 @@ export class FileSystemFeatureWorkspaceRepository implements FeatureWorkspaceRep
     }
   }
 
-  private readWorkspace(slug: string, dir: string, isArchived: boolean): Result<FeatureWorkspace, DomainError> {
+  private readWorkspace(slug: string, dir: string, isArchived: boolean): Result<FeatureWorkspace, WorkspaceResultError> {
     const metaPath = path.join(dir, META_FILE_NAME);
 
     if (!fs.existsSync(metaPath)) {
@@ -134,7 +134,7 @@ export class FileSystemFeatureWorkspaceRepository implements FeatureWorkspaceRep
     }
   }
 
-  private readWorkspacesFromDir(baseDir: string, isArchived: boolean): Result<FeatureWorkspace[], DomainError> {
+  private readWorkspacesFromDir(baseDir: string, isArchived: boolean): Result<FeatureWorkspace[], WorkspaceResultError> {
     if (!fs.existsSync(baseDir)) {
       return Result.ok([]);
     }

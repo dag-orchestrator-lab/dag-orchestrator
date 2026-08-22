@@ -1,8 +1,15 @@
-export type DomainError =
+export type WorkspaceResultError =
   | PersistenceReadError
   | PersistenceWriteError
   | ValidationError
   | NotFoundError;
+
+export abstract class DomainError extends Error {
+  constructor(message: string) {
+    super(message);
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
+}
 
 export interface PersistenceReadError {
   readonly kind: 'PersistenceReadError';

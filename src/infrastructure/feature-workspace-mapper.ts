@@ -1,5 +1,5 @@
 import { Result } from '../domain/common/result.js';
-import { DomainError } from '../domain/common/errors.js';
+import { WorkspaceResultError } from '../domain/common/errors.js';
 import { FeatureWorkspace, FeatureWorkspaceProps } from '../domain/feature-workspace/aggregates/feature-workspace.js';
 import { FeatureSlug } from '../domain/feature-workspace/value-objects/feature-slug.js';
 import { WorkspaceStatus } from '../domain/feature-workspace/value-objects/workspace-status.js';
@@ -10,7 +10,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function readError(directory: string, message: string): DomainError {
+function readError(directory: string, message: string): WorkspaceResultError {
   return { kind: 'PersistenceReadError', path: directory, cause: new Error(message) };
 }
 
@@ -28,7 +28,7 @@ export class FeatureWorkspaceMapper {
     directory: string,
     rawJson: unknown,
     isArchived: boolean,
-  ): Result<FeatureWorkspace, DomainError> {
+  ): Result<FeatureWorkspace, WorkspaceResultError> {
     if (!isPlainObject(rawJson)) {
       return Result.err(readError(directory, 'Workspace payload is not a valid object'));
     }
@@ -82,7 +82,7 @@ export class FeatureWorkspaceMapper {
   private static readApprovals(
     raw: unknown,
     directory: string,
-  ): Result<GateApproval[], DomainError> {
+  ): Result<GateApproval[], WorkspaceResultError> {
     if (raw === undefined) {
       return Result.ok([]);
     }
@@ -111,7 +111,7 @@ export class FeatureWorkspaceMapper {
     return Result.ok(approvals);
   }
 
-  private static readStages(raw: unknown, directory: string): Result<PipelineStage[], DomainError> {
+  private static readStages(raw: unknown, directory: string): Result<PipelineStage[], WorkspaceResultError> {
     if (raw === undefined) {
       return Result.ok([]);
     }
@@ -149,7 +149,7 @@ export class FeatureWorkspaceMapper {
     return Result.ok(stages);
   }
 
-  private static readArtifacts(raw: unknown, directory: string): Result<string[], DomainError> {
+  private static readArtifacts(raw: unknown, directory: string): Result<string[], WorkspaceResultError> {
     if (raw === undefined) {
       return Result.ok([]);
     }

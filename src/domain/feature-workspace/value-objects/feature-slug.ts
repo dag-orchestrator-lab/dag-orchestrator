@@ -1,5 +1,5 @@
 import { Result } from '../../common/result.js';
-import { DomainError } from '../../common/errors.js';
+import { WorkspaceResultError } from '../../common/errors.js';
 
 /** Value object representing the unique identity of a feature workspace. */
 export class FeatureSlug {
@@ -18,7 +18,7 @@ export class FeatureSlug {
    * @param input Raw feature name or slug candidate.
    * @returns A validated, slugified `FeatureSlug`, or a `ValidationError` if input is empty.
    */
-  public static create(input: string): Result<FeatureSlug, DomainError> {
+  public static create(input: string): Result<FeatureSlug, WorkspaceResultError> {
     if (!input || input.trim().length === 0) {
       return Result.err({
         kind: 'ValidationError',

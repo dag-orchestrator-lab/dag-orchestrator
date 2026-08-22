@@ -1,5 +1,5 @@
 import { Result } from '../../common/result.js';
-import { DomainError } from '../../common/errors.js';
+import { WorkspaceResultError } from '../../common/errors.js';
 
 export interface RollbackSnapshotProps {
   readonly snapshotId: string;
@@ -30,7 +30,7 @@ export class RollbackSnapshot {
    * @param props Snapshot fields.
    * @returns A frozen `RollbackSnapshot`, or a `ValidationError` if snapshotId or slug is missing.
    */
-  public static create(props: RollbackSnapshotProps): Result<RollbackSnapshot, DomainError> {
+  public static create(props: RollbackSnapshotProps): Result<RollbackSnapshot, WorkspaceResultError> {
     if (!props.snapshotId || props.snapshotId.trim().length === 0) {
       return Result.err({
         kind: 'ValidationError',

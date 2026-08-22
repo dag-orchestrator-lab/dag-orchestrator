@@ -1,5 +1,5 @@
 import { Result } from '../../common/result.js';
-import { DomainError } from '../../common/errors.js';
+import { WorkspaceResultError } from '../../common/errors.js';
 
 export interface GateApprovalProps {
   readonly gateName: string;
@@ -19,7 +19,7 @@ export class GateApproval {
     this.gateName = props.gateName;
     this.approver = props.approver;
     this.approvedAt = props.approvedAt;
-    this.metadata = Object.freeze({ ...(props.metadata ?? {}) });
+    this.metadata = Object.freeze({ ...props.metadata });
     Object.freeze(this);
   }
 
@@ -27,7 +27,7 @@ export class GateApproval {
    * @param props Gate approval fields.
    * @returns A frozen `GateApproval`, or a `ValidationError` if gateName or approver is empty.
    */
-  public static create(props: GateApprovalProps): Result<GateApproval, DomainError> {
+  public static create(props: GateApprovalProps): Result<GateApproval, WorkspaceResultError> {
     if (!props.gateName || props.gateName.trim().length === 0) {
       return Result.err({
         kind: 'ValidationError',

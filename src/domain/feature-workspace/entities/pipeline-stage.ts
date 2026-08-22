@@ -1,5 +1,5 @@
 import { Result } from '../../common/result.js';
-import { DomainError } from '../../common/errors.js';
+import { WorkspaceResultError } from '../../common/errors.js';
 import { GateApproval } from '../value-objects/gate-approval.js';
 
 export interface PipelineStageProps {
@@ -22,7 +22,7 @@ export class PipelineStage {
    * @param props Stage fields.
    * @returns A frozen `PipelineStage`, or a `ValidationError` if name is empty.
    */
-  public static create(props: PipelineStageProps): Result<PipelineStage, DomainError> {
+  public static create(props: PipelineStageProps): Result<PipelineStage, WorkspaceResultError> {
     if (!props.name || props.name.trim().length === 0) {
       return Result.err({
         kind: 'ValidationError',

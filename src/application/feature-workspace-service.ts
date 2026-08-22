@@ -1,5 +1,5 @@
 import { Result } from '../domain/common/result.js';
-import { DomainError } from '../domain/common/errors.js';
+import { WorkspaceResultError } from '../domain/common/errors.js';
 import { FeatureWorkspace } from '../domain/feature-workspace/aggregates/feature-workspace.js';
 import { FeatureSlug } from '../domain/feature-workspace/value-objects/feature-slug.js';
 import { WorkspaceStatus } from '../domain/feature-workspace/value-objects/workspace-status.js';
@@ -15,13 +15,13 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 export class FeatureWorkspaceService {
   constructor(private readonly repo: FeatureWorkspaceRepository) {}
 
-  public getFeatureContextMeta(slug: string): Result<unknown, DomainError> {
+  public getFeatureContextMeta(slug: string): Result<unknown, WorkspaceResultError> {
     const findResult = this.repo.findBySlug(slug);
     if (findResult.isErr) return findResult;
     return Result.ok(findResult.value.contextMeta);
   }
 
-  public saveFeatureContextMeta(slug: string, meta: unknown): Result<void, DomainError> {
+  public saveFeatureContextMeta(slug: string, meta: unknown): Result<void, WorkspaceResultError> {
     if (!isPlainObject(meta)) {
       return Result.err({
         kind: 'ValidationError',
@@ -55,27 +55,27 @@ export class FeatureWorkspaceService {
     return this.repo.save(workspace);
   }
 
-  public getFeatureWorkspaceDir(slug: string): Result<string, DomainError> {
+  public getFeatureWorkspaceDir(slug: string): Result<string, WorkspaceResultError> {
     return Result.ok(this.repo.getWorkspaceDir(slug));
   }
 
-  public resolveArtifactPath(slug: string, artifactName: string): Result<string, DomainError> {
+  public resolveArtifactPath(slug: string, artifactName: string): Result<string, WorkspaceResultError> {
     return Result.ok(this.repo.getArtifactPath(slug, artifactName));
   }
 
-  public listAllFeatures(): Result<unknown[], DomainError> {
+  public listAllFeatures(): Result<unknown[], WorkspaceResultError> {
     const result = this.repo.findAll();
     if (result.isErr) return result;
     return Result.ok(result.value.map((workspace) => workspace.toLegacyFormat()));
   }
 
-  public listArchivedFeatures(): Result<unknown[], DomainError> {
+  public listArchivedFeatures(): Result<unknown[], WorkspaceResultError> {
     const result = this.repo.findAllArchived();
     if (result.isErr) return result;
     return Result.ok(result.value.map((workspace) => workspace.toLegacyFormat()));
   }
 
-  public recordGateApproval(slug: string, gate: string, approval: unknown): Result<void, DomainError> {
+  public recordGateApproval(slug: string, gate: string, approval: unknown): Result<void, WorkspaceResultError> {
     if (!isPlainObject(approval)) {
       return Result.err({
         kind: 'ValidationError',
@@ -113,13 +113,13 @@ export class FeatureWorkspaceService {
     return this.repo.save(workspace);
   }
 
-  public getPipelineStatus(slug: string): Result<unknown, DomainError> {
+  public getPipelineStatus(slug: string): Result<unknown, WorkspaceResultError> {
     const findResult = this.repo.findBySlug(slug);
     if (findResult.isErr) return findResult;
     return Result.ok(PipelineEvaluator.evaluateStatus(findResult.value));
   }
 
-  public createRollbackSnapshot(slug: string): Result<unknown, DomainError> {
+  public createRollbackSnapshot(slug: string): Result<unknown, WorkspaceResultError> {
     const findResult = this.repo.findBySlug(slug);
     if (findResult.isErr) return findResult;
 
@@ -133,11 +133,11 @@ export class FeatureWorkspaceService {
     return Result.ok(snapshotResult.value.toLegacyFormat());
   }
 
-  public cleanArtifacts(slug: string): Result<void, DomainError> {
+  public cleanArtifacts(slug: string): Result<void, WorkspaceResultError> {
     return this.repo.cleanArtifacts(slug);
   }
 
-  public archiveFeatureWorkspace(slug: string): Result<void, DomainError> {
+  public archiveFeatureWorkspace(slug: string): Result<void, WorkspaceResultError> {
     const findResult = this.repo.findBySlug(slug);
     if (findResult.isErr) return findResult;
 
@@ -148,7 +148,7 @@ export class FeatureWorkspaceService {
     return this.repo.moveToArchived(workspace);
   }
 
-  public unarchiveFeatureWorkspace(slug: string): Result<void, DomainError> {
+  public unarchiveFeatureWorkspace(slug: string): Result<void, WorkspaceResultError> {
     const findResult = this.repo.findArchivedBySlug(slug);
     if (findResult.isErr) return findResult;
 
@@ -159,7 +159,7 @@ export class FeatureWorkspaceService {
     return this.repo.moveToActive(workspace);
   }
 
-  public activateFeatureWorkspace(slug: string): Result<void, DomainError> {
+  public activateFeatureWorkspace(slug: string): Result<void, WorkspaceResultError> {
     const findResult = this.repo.findBySlug(slug);
     if (findResult.isErr) return findResult;
 

@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { FeatureWorkspaceService } from '../feature-workspace-service.js';
 import { Result } from '../../domain/common/result.js';
-import { DomainError } from '../../domain/common/errors.js';
+import { WorkspaceResultError } from '../../domain/common/errors.js';
 import { FeatureWorkspace } from '../../domain/feature-workspace/aggregates/feature-workspace.js';
 import { FeatureWorkspaceRepository } from '../../domain/feature-workspace/ports/feature-workspace-repository.js';
 import { RollbackSnapshot } from '../../domain/feature-workspace/value-objects/rollback-snapshot.js';
@@ -10,48 +10,48 @@ class InMemoryFeatureWorkspaceRepository implements FeatureWorkspaceRepository {
   private readonly active = new Map<string, FeatureWorkspace>();
   private readonly archived = new Map<string, FeatureWorkspace>();
 
-  findBySlug(slug: string): Result<FeatureWorkspace, DomainError> {
+  findBySlug(slug: string): Result<FeatureWorkspace, WorkspaceResultError> {
     const workspace = this.active.get(slug);
     if (!workspace) return Result.err({ kind: 'NotFoundError', identifier: slug });
     return Result.ok(workspace);
   }
 
-  findArchivedBySlug(slug: string): Result<FeatureWorkspace, DomainError> {
+  findArchivedBySlug(slug: string): Result<FeatureWorkspace, WorkspaceResultError> {
     const workspace = this.archived.get(slug);
     if (!workspace) return Result.err({ kind: 'NotFoundError', identifier: `archived:${slug}` });
     return Result.ok(workspace);
   }
 
-  findAll(): Result<FeatureWorkspace[], DomainError> {
+  findAll(): Result<FeatureWorkspace[], WorkspaceResultError> {
     return Result.ok([...this.active.values()]);
   }
 
-  findAllArchived(): Result<FeatureWorkspace[], DomainError> {
+  findAllArchived(): Result<FeatureWorkspace[], WorkspaceResultError> {
     return Result.ok([...this.archived.values()]);
   }
 
-  save(workspace: FeatureWorkspace): Result<void, DomainError> {
+  save(workspace: FeatureWorkspace): Result<void, WorkspaceResultError> {
     this.active.set(workspace.slug.value, workspace);
     return Result.ok(undefined);
   }
 
-  moveToArchived(workspace: FeatureWorkspace): Result<void, DomainError> {
+  moveToArchived(workspace: FeatureWorkspace): Result<void, WorkspaceResultError> {
     this.active.delete(workspace.slug.value);
     this.archived.set(workspace.slug.value, workspace);
     return Result.ok(undefined);
   }
 
-  moveToActive(workspace: FeatureWorkspace): Result<void, DomainError> {
+  moveToActive(workspace: FeatureWorkspace): Result<void, WorkspaceResultError> {
     this.archived.delete(workspace.slug.value);
     this.active.set(workspace.slug.value, workspace);
     return Result.ok(undefined);
   }
 
-  saveSnapshot(_slug: string, _snapshot: RollbackSnapshot): Result<void, DomainError> {
+  saveSnapshot(_slug: string, _snapshot: RollbackSnapshot): Result<void, WorkspaceResultError> {
     return Result.ok(undefined);
   }
 
-  cleanArtifacts(_slug: string): Result<void, DomainError> {
+  cleanArtifacts(_slug: string): Result<void, WorkspaceResultError> {
     return Result.ok(undefined);
   }
 
