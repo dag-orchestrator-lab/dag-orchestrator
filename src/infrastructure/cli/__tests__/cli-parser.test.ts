@@ -23,7 +23,11 @@ describe('CliParser.parse', () => {
     expect(result).toEqual({ type: 'unknown', args: [], flags: {}, rawCommand: '' });
   });
 
-  it.each(['init', 'doctor', 'features', 'new', 'archive', 'rollback', 'config', 'commit', 'ship', 'stack', 'next', 'step0', 'step1', 'step2', 'step3', 'step4'])(
+  it.each([
+    'init', 'doctor', 'features', 'new', 'archive', 'rollback', 'config', 'commit', 'ship', 'stack', 'next',
+    'step0', 'step1', 'step2', 'step3', 'step4',
+    'rules', 'service', 'verify', 'switch', 'unarchive', 'clean', 'status', 'stats', 'all', 'web',
+  ])(
     'recognizes command %s',
     (command) => {
       const result = CliParser.parse(['node', 'dag', command]);
@@ -39,6 +43,27 @@ describe('CliParser.parse', () => {
   it('resolves the "review" alias to step4', () => {
     const result = CliParser.parse(['node', 'dag', 'review']);
     expect(result.type).toBe('step4');
+  });
+
+  it.each([
+    ['build', 'step3'],
+    ['spec', 'step1'],
+    ['contract', 'step1'],
+    ['tasks', 'step2'],
+    ['decompose', 'step2'],
+    ['rule', 'rules'],
+    ['services', 'service'],
+    ['audit', 'verify'],
+    ['activate', 'switch'],
+    ['restore', 'switch'],
+    ['archives', 'archive'],
+    ['list', 'features'],
+    ['benchmark', 'stats'],
+    ['run', 'all'],
+    ['dsh', 'web'],
+  ])('resolves the "%s" alias to %s', (alias, canonical) => {
+    const result = CliParser.parse(['node', 'dag', alias]);
+    expect(result.type).toBe(canonical);
   });
 
   it('lowercases the command name', () => {

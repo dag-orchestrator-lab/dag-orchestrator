@@ -14,6 +14,16 @@ export type CommandType =
   | 'stack'
   | 'next'
   | 'step'
+  | 'rules'
+  | 'service'
+  | 'verify'
+  | 'switch'
+  | 'unarchive'
+  | 'clean'
+  | 'status'
+  | 'stats'
+  | 'all'
+  | 'web'
   | 'unknown';
 
 /** Encapsulates raw command-line input parsed into a recognized execution target. */

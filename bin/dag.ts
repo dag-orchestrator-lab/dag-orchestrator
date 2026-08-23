@@ -2,7 +2,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Result } from '../src/domain/common/result.js';
 import type { WorkspaceResultError } from '../src/domain/common/errors.js';
@@ -44,6 +44,16 @@ const REVIEW_ARTIFACT = 'REVIEW.md';
 /** Matches a completed/incomplete atomic task heading line in `05-tasks.md`, per 05-tasks.md's own `### [ ] T-N` convention. */
 const INCOMPLETE_TASK_HEADING = /^###\s+\[\s\]\s+T-\d+/;
 const COMPLETE_TASK_HEADING = /^###\s+\[x\]\s+T-\d+/i;
+
+/** Legacy `.dagrules` team-wide and repository-local architecture rules filenames, resolved from `cwd`. */
+const RULES_FILENAME = '.dagrules';
+const RULES_LOCAL_FILENAME = '.dagrules.local';
+
+/** Filename of the linked-service registry, relative to `.dag/`, mirroring legacy `dag service link/unlink`. */
+const SERVICES_REGISTRY_FILENAME = 'services.json';
+
+/** Package `dag web`/`dag dsh` launches to serve the DeepSeek Harness dashboard, per legacy `bin/dag.js`. */
+const DSH_WEB_PACKAGE = '@deepseek-ai/dsh';
 
 const execFileAsync = promisify(execFile);
 
@@ -92,6 +102,16 @@ Commands:
   stack <base> [new]     Fetch base branch and create a stacked feature branch
   next                   Evaluate pipeline state and auto-advance to the next step
   step0..step4          Run a pipeline stage with dirty-tree guard and auto-heal
+  rules, rule            Show active .dagrules / .dagrules.local
+  service, services      Link/unlink/list microservice workspaces
+  verify, audit          Report which pipeline artifacts exist
+  switch, activate, restore <name>  Activate a stored feature workspace
+  unarchive <name>       Restore an archived workspace to active features
+  clean                  Remove pipeline artifacts for the active workspace
+  status                 Show the active workspace's pipeline status
+  stats, benchmark       Show cost/token telemetry
+  all, run               Run the entire pipeline end-to-end
+  web, dsh               Launch the DeepSeek Harness web dashboard
 `);
 }
 
@@ -525,6 +545,199 @@ async function handleNext(): Promise<void> {
   }
 }
 
+/** Prints `.dagrules` (team-wide) and `.dagrules.local` (repository-local) contents, mirroring legacy `dag rules`. */
+function handleRules(args: string[]): void {
+  const [subcommand] = args;
+  if (subcommand !== undefined) {
+    console.log(`Rule management subcommand "${subcommand}" is not available in this CLI; showing active rules instead.`);
+  }
+
+  const teamRulesPath = path.join(cwd, RULES_FILENAME);
+  const localRulesPath = path.join(cwd, RULES_LOCAL_FILENAME);
+
+  if (fs.existsSync(teamRulesPath)) {
+    console.log(`--- ${RULES_FILENAME} ---`);
+    console.log(fs.readFileSync(teamRulesPath, 'utf-8'));
+  } else {
+    console.log(`No ${RULES_FILENAME} file found.`);
+  }
+
+  if (fs.existsSync(localRulesPath)) {
+    console.log(`--- ${RULES_LOCAL_FILENAME} ---`);
+    console.log(fs.readFileSync(localRulesPath, 'utf-8'));
+  }
+}
+
+interface ServiceRegistryEntry {
+  readonly name: string;
+  readonly path: string;
+}
+
+function isServiceRegistryEntry(value: unknown): value is ServiceRegistryEntry {
+  return isPlainRecord(value) && typeof value.name === 'string' && typeof value.path === 'string';
+}
+
+function readServiceRegistry(): ServiceRegistryEntry[] {
+  const registryPath = path.join(configuration.dagDir, SERVICES_REGISTRY_FILENAME);
+  if (!fs.existsSync(registryPath)) {
+    return [];
+  }
+  try {
+    const parsed: unknown = JSON.parse(fs.readFileSync(registryPath, 'utf-8'));
+    return Array.isArray(parsed) ? parsed.filter(isServiceRegistryEntry) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeServiceRegistry(entries: ServiceRegistryEntry[]): void {
+  const registryPath = path.join(configuration.dagDir, SERVICES_REGISTRY_FILENAME);
+  fs.mkdirSync(configuration.dagDir, { recursive: true });
+  fs.writeFileSync(registryPath, JSON.stringify(entries, null, 2), 'utf-8');
+}
+
+/** Links, unlinks, or lists linked microservices/monorepo packages, mirroring legacy `dag service`. */
+async function handleService(args: string[]): Promise<void> {
+  const [subcommand, nameArg, pathArg] = args;
+
+  if (subcommand === 'link') {
+    const name = (nameArg ?? (await prompter.askQuestion('Enter service name: '))).trim();
+    const targetPath = (pathArg ?? (await prompter.askQuestion('Enter path to service folder: '))).trim();
+    if (!name || !targetPath) {
+      throw new Error('Usage: dag service link <name> <path>');
+    }
+    const registry = readServiceRegistry().filter((entry) => entry.name !== name);
+    registry.push({ name, path: targetPath });
+    writeServiceRegistry(registry);
+    console.log(`Linked service "${name}" -> ${targetPath}`);
+    return;
+  }
+
+  if (subcommand === 'unlink') {
+    const name = (nameArg ?? (await prompter.askQuestion('Enter service name to unlink: '))).trim();
+    const registry = readServiceRegistry();
+    const remaining = registry.filter((entry) => entry.name !== name);
+    if (remaining.length === registry.length) {
+      console.log(`Service "${name}" was not linked.`);
+      return;
+    }
+    writeServiceRegistry(remaining);
+    console.log(`Unlinked service "${name}".`);
+    return;
+  }
+
+  const registry = readServiceRegistry();
+  if (registry.length === 0) {
+    console.log('No linked services found.');
+  } else {
+    for (const entry of registry) {
+      console.log(`- ${entry.name} -> ${entry.path}`);
+    }
+  }
+  console.log('Usage:\n  dag service link <name> <path>\n  dag service unlink <name>');
+}
+
+/** Reports which pipeline artifacts exist for the active workspace, mirroring legacy `dag verify`/`dag audit`. */
+async function handleVerify(): Promise<void> {
+  console.log('Verifying pipeline artifacts...');
+  const artifacts: ReadonlyArray<[string, string]> = [
+    [REQUIREMENTS_ARTIFACT, 'Requirements'],
+    [CONTRACTS_ARTIFACT, 'Contracts'],
+    [TASKS_ARTIFACT, 'Tasks'],
+    [REVIEW_ARTIFACT, 'Review'],
+  ];
+  for (const [artifact, label] of artifacts) {
+    console.log(`${hasArtifact(artifact) ? '✓' : '○'} ${label} (${artifact})`);
+  }
+  const { implementedCount, totalTasks } = countTasks();
+  console.log(`Tasks: ${implementedCount}/${totalTasks} implemented.`);
+}
+
+/** Activates a stored feature workspace as current, mirroring legacy `dag switch`/`dag activate`/`dag restore`. */
+async function handleSwitch(nameArg: string | undefined): Promise<void> {
+  const targetName = (nameArg ?? (await prompter.askQuestion('Enter feature name to activate: '))).trim();
+  if (!targetName) {
+    throw new Error('No feature specified.');
+  }
+  unwrapOrThrow(workspaceService.activateFeatureWorkspace(targetName));
+  console.log(`Workspace "${targetName}" is now active.`);
+}
+
+/** Restores an archived feature workspace to the active features folder, mirroring legacy `dag unarchive`. */
+async function handleUnarchive(nameArg: string | undefined): Promise<void> {
+  const targetName = (nameArg ?? (await prompter.askQuestion('Enter archived feature name to unarchive: '))).trim();
+  if (!targetName) {
+    throw new Error('No feature specified.');
+  }
+  unwrapOrThrow(workspaceService.unarchiveFeatureWorkspace(targetName));
+  console.log(`Feature "${targetName}" restored to active features.`);
+}
+
+/** Clears pipeline artifacts for the active workspace after confirmation, mirroring legacy `dag clean`. */
+async function handleClean(): Promise<void> {
+  const targetName = resolveActiveWorkspaceName();
+  if (!targetName) {
+    throw new Error('No active workspace to clean.');
+  }
+  const confirmation = await prompter.askQuestion('Are you sure you want to remove all pipeline artifacts? (y/N): ');
+  if (confirmation.trim().toLowerCase() !== 'y') {
+    console.log('Clean aborted.');
+    return;
+  }
+  unwrapOrThrow(workspaceService.cleanArtifacts(targetName));
+  console.log(`Cleaned pipeline artifacts for "${targetName}".`);
+}
+
+/** Prints the active workspace's pipeline status, mirroring legacy `dag status`. */
+async function handleStatus(): Promise<void> {
+  const targetName = resolveActiveWorkspaceName();
+  if (!targetName) {
+    console.log('No active workspace.');
+    return;
+  }
+  const status = unwrapOrThrow(workspaceService.getPipelineStatus(targetName));
+  console.log(JSON.stringify(status, null, 2));
+}
+
+/** Prints available cost/token telemetry, mirroring legacy `dag stats`/`dag benchmark` (no telemetry Use Case exists yet). */
+async function handleStats(): Promise<void> {
+  console.log('No cost/token telemetry recorded yet.');
+}
+
+/** Runs the full pipeline end-to-end, reusing existing artifacts when present, mirroring legacy `dag all`/`dag run`. */
+async function handleAll(args: string[]): Promise<void> {
+  if (!hasArtifact(REQUIREMENTS_ARTIFACT)) {
+    await pipelineAdvancer.runStep0();
+  } else {
+    console.log(`Found existing ${REQUIREMENTS_ARTIFACT}; reusing it and skipping Step 0.`);
+  }
+
+  if (!hasArtifact(CONTRACTS_ARTIFACT)) {
+    await pipelineAdvancer.runStep1();
+  } else {
+    console.log(`Found existing ${CONTRACTS_ARTIFACT}; reusing it and skipping Step 1.`);
+  }
+
+  if (!hasArtifact(TASKS_ARTIFACT)) {
+    await pipelineAdvancer.runStep2();
+  } else {
+    console.log(`Found existing ${TASKS_ARTIFACT}; reusing it and skipping Step 2.`);
+  }
+
+  void args;
+  await pipelineAdvancer.runStep3();
+  await pipelineAdvancer.runStep4();
+}
+
+/** Launches the DeepSeek Harness web dashboard, mirroring legacy `dag web`/`dag dsh`. */
+function handleWeb(): void {
+  console.log('Launching DeepSeek Harness Web Dashboard...');
+  const dshProcess = spawn('npx', [DSH_WEB_PACKAGE, 'web'], { stdio: 'inherit', cwd });
+  dshProcess.on('error', (error) => {
+    console.error(`Failed to launch dsh: ${toDisplayError(error).message}`);
+  });
+}
+
 async function handleStep(type: 'step0' | 'step1' | 'step2' | 'step3' | 'step4'): Promise<void> {
   switch (type) {
     case 'step0':
@@ -576,6 +789,26 @@ async function dispatch(parsed: ParsedCommand): Promise<void> {
     case 'step3':
     case 'step4':
       return handleStep(parsed.type);
+    case 'rules':
+      return handleRules(parsed.args);
+    case 'service':
+      return handleService(parsed.args);
+    case 'verify':
+      return handleVerify();
+    case 'switch':
+      return handleSwitch(parsed.args[0]);
+    case 'unarchive':
+      return handleUnarchive(parsed.args[0]);
+    case 'clean':
+      return handleClean();
+    case 'status':
+      return handleStatus();
+    case 'stats':
+      return handleStats();
+    case 'all':
+      return handleAll(parsed.args);
+    case 'web':
+      return handleWeb();
     case 'unknown':
     default:
       printUsage();

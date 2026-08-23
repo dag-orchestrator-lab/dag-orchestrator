@@ -16,6 +16,16 @@ export type CommandType =
   | 'step2'
   | 'step3'
   | 'step4'
+  | 'rules'
+  | 'service'
+  | 'verify'
+  | 'switch'
+  | 'unarchive'
+  | 'clean'
+  | 'status'
+  | 'stats'
+  | 'all'
+  | 'web'
   | 'unknown';
 
 export interface ParsedCommand {
@@ -29,12 +39,29 @@ const KNOWN_COMMANDS: readonly CommandType[] = [
   'init', 'doctor', 'features', 'plan', 'new', 'archive',
   'rollback', 'config', 'commit', 'ship', 'stack', 'next',
   'step0', 'step1', 'step2', 'step3', 'step4',
+  'rules', 'service', 'verify', 'switch', 'unarchive',
+  'clean', 'status', 'stats', 'all', 'web',
 ];
 
 /** Legacy `bin/dag.js` command aliases that resolve directly to a canonical {@link CommandType}. */
 const COMMAND_ALIASES: Readonly<Record<string, CommandType>> = {
   implement: 'step3',
+  build: 'step3',
   review: 'step4',
+  spec: 'step1',
+  contract: 'step1',
+  tasks: 'step2',
+  decompose: 'step2',
+  rule: 'rules',
+  services: 'service',
+  audit: 'verify',
+  activate: 'switch',
+  restore: 'switch',
+  archives: 'archive',
+  list: 'features',
+  benchmark: 'stats',
+  run: 'all',
+  dsh: 'web',
 };
 
 /** Zero-dependency parser mapping raw process.argv into a typed ParsedCommand. */
