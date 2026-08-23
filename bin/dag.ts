@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import fs from 'node:fs';
+import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Result } from '../src/domain/common/result.js';
@@ -27,8 +29,21 @@ const DEFAULT_CONFIG_VERSION = '1.0.0';
 /** Default LLM provider offered by `dag init` when the user declines to type one. */
 const DEFAULT_LLM_PROVIDER = 'gemini';
 
-/** `.dag/config.json` stage key `dag commit` uses to resolve its LLM provider. */
+/** `.dag/config.json` stage key `dag commit`/`dag ship` use to resolve their LLM provider. */
 const COMMIT_STAGE_NAME = 'commit';
+
+/** Base branch `dag ship`/`dag stack` target when `.dag/config.json` omits `STACKED_BASE_BRANCH`. */
+const DEFAULT_BASE_BRANCH = 'develop';
+
+/** Pipeline artifact filenames `dag next` inspects in the working directory, mirroring legacy `getPipelineStatus`. */
+const REQUIREMENTS_ARTIFACT = '00-requirements.md';
+const CONTRACTS_ARTIFACT = '02-contracts.md';
+const TASKS_ARTIFACT = '05-tasks.md';
+const REVIEW_ARTIFACT = 'REVIEW.md';
+
+/** Matches a completed/incomplete atomic task heading line in `05-tasks.md`, per 05-tasks.md's own `### [ ] T-N` convention. */
+const INCOMPLETE_TASK_HEADING = /^###\s+\[\s\]\s+T-\d+/;
+const COMPLETE_TASK_HEADING = /^###\s+\[x\]\s+T-\d+/i;
 
 const execFileAsync = promisify(execFile);
 
@@ -73,6 +88,9 @@ Commands:
   rollback [name]       Create a rollback snapshot (defaults to the active one)
   config [get|set k v]  Read or write .dag/config.json
   commit                 Generate an AI commit message for the working tree diff and commit locally
+  ship                   Commit (AI message), push, and open a Pull Request
+  stack <base> [new]     Fetch base branch and create a stacked feature branch
+  next                   Evaluate pipeline state and auto-advance to the next step
   step0..step4          Run a pipeline stage with dirty-tree guard and auto-heal
 `);
 }
@@ -86,10 +104,33 @@ const workspaceService = new FeatureWorkspaceService(workspaceRepository);
 const dagConfigRepository = new DagConfigRepository(configuration);
 const executeStageUseCase = new ExecuteStagePromptUseCase(new ProviderFactory());
 
-const stackedBaseBranchRaw = (loadConfig(cwd) as Record<string, unknown>).STACKED_BASE_BRANCH;
+function resolveStackedBaseBranch(): string | undefined {
+  const raw = (loadConfig(cwd) as Record<string, unknown>).STACKED_BASE_BRANCH;
+  return typeof raw === 'string' ? raw : undefined;
+}
+
 const pipelineAdvancer = new DefaultPipelineAdvancer(gitAdapter, prompter, executeStageUseCase, cwd, {
-  STACKED_BASE_BRANCH: typeof stackedBaseBranchRaw === 'string' ? stackedBaseBranchRaw : undefined,
+  STACKED_BASE_BRANCH: resolveStackedBaseBranch(),
 });
+
+/**
+ * Merges `updates` into `.dag/config.json`'s raw JSON, mirroring legacy `saveLocalConfig`.
+ * Bypasses `DagConfigRepository`'s strict schema so passthrough fields (`STACKED_BASE_BRANCH`,
+ * `ACTIVE_BRANCH`) survive, matching `ConfigSchema`'s `.passthrough()` read side.
+ */
+function saveLocalConfigUpdates(updates: Record<string, string>): void {
+  const configPath = path.join(configuration.dagDir, 'config.json');
+  let current: Record<string, unknown> = {};
+  if (fs.existsSync(configPath)) {
+    try {
+      current = JSON.parse(fs.readFileSync(configPath, 'utf-8')) as Record<string, unknown>;
+    } catch {
+      current = {};
+    }
+  }
+  fs.mkdirSync(configuration.dagDir, { recursive: true });
+  fs.writeFileSync(configPath, JSON.stringify({ ...current, ...updates }, null, 2), 'utf-8');
+}
 
 /** Bridges `FeatureWorkspaceService`'s confirmed (T-8) surface to the `FeatureWorkspaceGuardService` port the guard depends on. */
 const workspaceGuardService: FeatureWorkspaceGuardService = {
@@ -262,6 +303,42 @@ async function createCommit(message: string): Promise<void> {
 }
 
 /**
+ * Asks the LLM for a conventional commit message summarizing `diff`.
+ * @returns The generated message, trimmed.
+ */
+async function generateCommitMessage(diff: string): Promise<string> {
+  const prompt = `Generate a concise, conventional commit message for the following git diff. Respond with only the commit message, no explanation or code fences.\n\n${diff}`;
+  const result = await executeStageUseCase.execute(COMMIT_STAGE_NAME, prompt);
+  if (result.isErr) {
+    throw toDisplayError(result.error);
+  }
+  return result.value.trim();
+}
+
+/**
+ * Generates a commit message for `diff`, shows it to the user, and lets them accept, edit,
+ * or abort. Shared by `dag commit` and `dag ship` so both produce consistent AI messages.
+ * @returns The user-confirmed final message, or `null` if the user aborted.
+ */
+async function resolveCommitMessage(diff: string): Promise<string | null> {
+  const generatedMessage = await generateCommitMessage(diff);
+  console.log('\nProposed commit message:\n');
+  console.log(generatedMessage);
+
+  const answer = await prompter.askQuestion('\nCommit with this message? (y/n/edit): ');
+  const normalized = answer.trim().toLowerCase();
+
+  if (normalized === 'edit' || normalized === 'e') {
+    const edited = (await prompter.askMultiLine('Enter your commit message (blank line or --- to finish):')).trim();
+    return edited || null;
+  }
+  if (normalized !== 'y' && normalized !== 'yes') {
+    return null;
+  }
+  return generatedMessage;
+}
+
+/**
  * Extracts the working tree diff, asks the LLM for a conventional commit message, then
  * prompts the user to accept, edit, or abort before committing locally (never pushes).
  */
@@ -272,27 +349,8 @@ async function handleCommit(): Promise<void> {
     return;
   }
 
-  const prompt = `Generate a concise, conventional commit message for the following git diff. Respond with only the commit message, no explanation or code fences.\n\n${diff}`;
-  const result = await executeStageUseCase.execute(COMMIT_STAGE_NAME, prompt);
-  if (result.isErr) {
-    throw toDisplayError(result.error);
-  }
-
-  const generatedMessage = result.value.trim();
-  console.log('\nProposed commit message:\n');
-  console.log(generatedMessage);
-
-  const answer = await prompter.askQuestion('\nCommit with this message? (y/n/edit): ');
-  const normalized = answer.trim().toLowerCase();
-
-  let finalMessage = generatedMessage;
-  if (normalized === 'edit' || normalized === 'e') {
-    finalMessage = (await prompter.askMultiLine('Enter your commit message (blank line or --- to finish):')).trim();
-    if (!finalMessage) {
-      console.log('Commit aborted: empty message.');
-      return;
-    }
-  } else if (normalized !== 'y' && normalized !== 'yes') {
+  const finalMessage = await resolveCommitMessage(diff);
+  if (!finalMessage) {
     console.log('Commit aborted.');
     return;
   }
@@ -300,6 +358,171 @@ async function handleCommit(): Promise<void> {
   await stageAllChanges();
   await createCommit(finalMessage);
   console.log('✓ Commit created.');
+}
+
+/** @returns `true` if the GitHub CLI (`gh`) is on `PATH`. */
+async function isGhCliInstalled(): Promise<boolean> {
+  try {
+    await execFileAsync('which', ['gh']);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** @returns The current Git branch name, or `''` if it could not be determined. */
+async function resolveCurrentBranch(): Promise<string> {
+  try {
+    const { stdout } = await execFileAsync('git', ['branch', '--show-current'], { cwd });
+    return stdout.trim();
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Commits any pending changes (reusing `dag commit`'s AI message generation), pushes the
+ * current branch to origin, and offers to open a Pull Request via the GitHub CLI.
+ */
+async function handleShip(): Promise<void> {
+  const isClean = await gitAdapter.isWorkingTreeClean(cwd);
+  if (!isClean) {
+    const diff = await extractWorkingTreeDiff();
+    const finalMessage = diff.trim() ? await resolveCommitMessage(diff) : null;
+    if (!finalMessage) {
+      console.log('Ship aborted: uncommitted changes were not committed.');
+      return;
+    }
+    await stageAllChanges();
+    await createCommit(finalMessage);
+    console.log('✓ Commit created.');
+  }
+
+  console.log('Pushing branch to origin...');
+  await execFileAsync('git', ['push', 'origin', 'HEAD'], { cwd });
+  console.log('✓ Branch pushed to origin.');
+
+  if (!(await isGhCliInstalled())) {
+    console.log('GitHub CLI (`gh`) not detected; skipping Pull Request creation.');
+    return;
+  }
+
+  const doPr = await prompter.askQuestion('Open a GitHub Pull Request now via `gh`? (y/n): ');
+  const normalized = doPr.trim().toLowerCase();
+  if (normalized !== 'y' && normalized !== 'yes') {
+    console.log('Pull Request creation skipped.');
+    return;
+  }
+
+  const currentBranch = await resolveCurrentBranch();
+  const baseBranch = resolveStackedBaseBranch() ?? DEFAULT_BASE_BRANCH;
+  const defaultTitle = currentBranch || 'Ship changes';
+  const titleAnswer = await prompter.askQuestion(`Pull Request title [${defaultTitle}]: `);
+  const title = titleAnswer.trim() || defaultTitle;
+
+  try {
+    const { stdout } = await execFileAsync('gh', [
+      'pr',
+      'create',
+      '--title',
+      title,
+      '--body',
+      '',
+      '--head',
+      currentBranch,
+      '--base',
+      baseBranch,
+    ], { cwd });
+    console.log(`✓ Pull Request created:\n${stdout}`);
+  } catch (error) {
+    console.warn(`⚠ Could not create Pull Request via gh: ${toDisplayError(error).message}`);
+  }
+}
+
+/**
+ * Fetches `baseBranch` from origin and creates+checks out a new branch stacked on top of it,
+ * recording the parent relationship in `.dag/config.json` so `dag ship` targets it automatically.
+ */
+async function handleStack(baseArg: string | undefined, newArg: string | undefined): Promise<void> {
+  const baseBranch = (baseArg ?? (await prompter.askQuestion('Enter base branch to stack on: '))).trim();
+  if (!baseBranch) {
+    throw new Error('Base branch is required.');
+  }
+
+  const newBranch = (newArg ?? (await prompter.askQuestion(`Enter new feature branch name (stacked on ${baseBranch}): `))).trim();
+  if (!newBranch) {
+    throw new Error('New branch name is required.');
+  }
+
+  console.log(`Fetching latest changes from origin/${baseBranch}...`);
+  await execFileAsync('git', ['fetch', 'origin', baseBranch], { cwd });
+
+  console.log(`Creating and switching to stacked branch "${newBranch}"...`);
+  await execFileAsync('git', ['checkout', '-b', newBranch, `origin/${baseBranch}`], { cwd });
+
+  saveLocalConfigUpdates({ STACKED_BASE_BRANCH: baseBranch, ACTIVE_BRANCH: newBranch });
+  console.log(`✓ Created and checked out "${newBranch}" stacked on "${baseBranch}".`);
+}
+
+/** @returns `true` if `artifactName` exists in the current working directory. */
+function hasArtifact(artifactName: string): boolean {
+  return fs.existsSync(path.join(cwd, artifactName));
+}
+
+/** Counts complete/total atomic tasks in `05-tasks.md` by its `### [ ]`/`### [x]` heading convention. */
+function countTasks(): { implementedCount: number; totalTasks: number } {
+  let implementedCount = 0;
+  let totalTasks = 0;
+  const tasksPath = path.join(cwd, TASKS_ARTIFACT);
+  if (!fs.existsSync(tasksPath)) {
+    return { implementedCount, totalTasks };
+  }
+  const lines = fs.readFileSync(tasksPath, 'utf-8').split('\n');
+  for (const line of lines) {
+    if (INCOMPLETE_TASK_HEADING.test(line)) {
+      totalTasks++;
+    } else if (COMPLETE_TASK_HEADING.test(line)) {
+      totalTasks++;
+      implementedCount++;
+    }
+  }
+  return { implementedCount, totalTasks };
+}
+
+/**
+ * Evaluates which pipeline artifacts exist and routes to the next incomplete step,
+ * mirroring legacy `dag next`'s `getPipelineStatus`-driven advancer.
+ */
+async function handleNext(): Promise<void> {
+  if (!hasArtifact(REQUIREMENTS_ARTIFACT)) {
+    console.log('Next step: Step 0 (Requirements Refinement).');
+    return pipelineAdvancer.runStep0();
+  }
+  if (!hasArtifact(CONTRACTS_ARTIFACT)) {
+    console.log('Next step: Step 1 (Contract & Skeptic Audit).');
+    return pipelineAdvancer.runStep1();
+  }
+  if (!hasArtifact(TASKS_ARTIFACT)) {
+    console.log('Next step: Step 2 (Layer Decomposition & Merge).');
+    return pipelineAdvancer.runStep2();
+  }
+
+  const { implementedCount, totalTasks } = countTasks();
+  if (totalTasks === 0 || implementedCount < totalTasks) {
+    console.log(`Next step: Step 3 (Task Implementation ${implementedCount + 1}/${Math.max(totalTasks, 1)}).`);
+    return pipelineAdvancer.runStep3();
+  }
+  if (!hasArtifact(REVIEW_ARTIFACT)) {
+    console.log('Next step: Step 4 (Full-Repo Impact Review).');
+    return pipelineAdvancer.runStep4();
+  }
+
+  console.log('✓ All pipeline stages are complete.');
+  const shipAnswer = await prompter.askQuestion('Ship Pull Request now (`dag ship`)? (y/n): ');
+  const normalized = shipAnswer.trim().toLowerCase();
+  if (!normalized || normalized === 'y' || normalized === 'yes') {
+    return handleShip();
+  }
 }
 
 async function handleStep(type: 'step0' | 'step1' | 'step2' | 'step3' | 'step4'): Promise<void> {
@@ -341,6 +564,12 @@ async function dispatch(parsed: ParsedCommand): Promise<void> {
       return handleConfig(parsed.args);
     case 'commit':
       return handleCommit();
+    case 'ship':
+      return handleShip();
+    case 'stack':
+      return handleStack(parsed.args[0], parsed.args[1]);
+    case 'next':
+      return handleNext();
     case 'step0':
     case 'step1':
     case 'step2':

@@ -10,6 +10,9 @@ export type CommandType =
   | 'rollback'
   | 'config'
   | 'commit'
+  | 'ship'
+  | 'stack'
+  | 'next'
   | 'step'
   | 'unknown';
 

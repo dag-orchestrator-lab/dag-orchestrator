@@ -8,6 +8,9 @@ export type CommandType =
   | 'rollback'
   | 'config'
   | 'commit'
+  | 'ship'
+  | 'stack'
+  | 'next'
   | 'step0'
   | 'step1'
   | 'step2'
@@ -24,8 +27,15 @@ export interface ParsedCommand {
 
 const KNOWN_COMMANDS: readonly CommandType[] = [
   'init', 'doctor', 'features', 'plan', 'new', 'archive',
-  'rollback', 'config', 'commit', 'step0', 'step1', 'step2', 'step3', 'step4',
+  'rollback', 'config', 'commit', 'ship', 'stack', 'next',
+  'step0', 'step1', 'step2', 'step3', 'step4',
 ];
+
+/** Legacy `bin/dag.js` command aliases that resolve directly to a canonical {@link CommandType}. */
+const COMMAND_ALIASES: Readonly<Record<string, CommandType>> = {
+  implement: 'step3',
+  review: 'step4',
+};
 
 /** Zero-dependency parser mapping raw process.argv into a typed ParsedCommand. */
 export class CliParser {
@@ -63,9 +73,9 @@ export class CliParser {
       }
     }
 
-    const type: CommandType = KNOWN_COMMANDS.includes(commandStr as CommandType)
-      ? (commandStr as CommandType)
-      : 'unknown';
+    const type: CommandType =
+      COMMAND_ALIASES[commandStr] ??
+      (KNOWN_COMMANDS.includes(commandStr as CommandType) ? (commandStr as CommandType) : 'unknown');
 
     return {
       type,

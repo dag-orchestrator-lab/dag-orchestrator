@@ -23,13 +23,23 @@ describe('CliParser.parse', () => {
     expect(result).toEqual({ type: 'unknown', args: [], flags: {}, rawCommand: '' });
   });
 
-  it.each(['init', 'doctor', 'features', 'new', 'archive', 'rollback', 'config', 'commit', 'step0', 'step1', 'step2', 'step3', 'step4'])(
+  it.each(['init', 'doctor', 'features', 'new', 'archive', 'rollback', 'config', 'commit', 'ship', 'stack', 'next', 'step0', 'step1', 'step2', 'step3', 'step4'])(
     'recognizes command %s',
     (command) => {
       const result = CliParser.parse(['node', 'dag', command]);
       expect(result.type).toBe(command);
     }
   );
+
+  it('resolves the "implement" alias to step3', () => {
+    const result = CliParser.parse(['node', 'dag', 'implement']);
+    expect(result.type).toBe('step3');
+  });
+
+  it('resolves the "review" alias to step4', () => {
+    const result = CliParser.parse(['node', 'dag', 'review']);
+    expect(result.type).toBe('step4');
+  });
 
   it('lowercases the command name', () => {
     const result = CliParser.parse(['node', 'dag', 'PLAN', 'foo']);
