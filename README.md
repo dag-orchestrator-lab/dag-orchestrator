@@ -161,19 +161,19 @@ The DAG Orchestrator roadmap is designed around increasing IDE integration, mult
 - [x] **Smart Rebase & Interactive Ship Flow:** Auto-suggests conventional commit titles and handles non-fast-forward git rebase recovery automatically.
 - [x] **TypeScript Porting (Phase 3):** Complete strict TypeScript migration for the entire orchestrator, value objects, and CLI router.
 
-### 🟣 `v0.3.0` (Double-Diamond Design Mode & Vertical Feature Slicing)
+### 🟣 `v0.3.0` (Swarm Engine & Knowledge Graph RAG)
+- [ ] **Phase 4: Swarm Engine (Multi-Agent Loops):** Dynamic delegation of TDD and research tasks to specialized autonomous sub-agents with robust IPC messaging.
+- [ ] **Phase 5: Knowledge Graph RAG & Context Retrieval:** AST-driven deterministic graph generation (`ts-morph`) and semantic commit-lifecycle event tagging to solve LLM context window limits without staleness.
+- [ ] **Gate 3 (Human Acceptance & Live Verification Gate):** Pauses upon test completion for real human testing against live databases/servers, supporting incremental contract addendums (`02-contracts.addendum.md`) without breaking baseline frozen contracts.
+
+### ⚡ `v0.4.0` (Double-Diamond Design & Specialized Harnesses)
 - [ ] **`dag design` (Exploratory Problem Harness):** Divergent exploration engine generating user persona journeys (`00-personas.md`), candidate architectural trade-offs (`00-tradeoffs.md`), and locked problem statements before code execution.
 - [ ] **Gate 0 (The Design Gate):** Human approval of the problem framing and architectural direction before entering technical recon.
 - [ ] **Automatic Vertical Feature Slicing (Epics $\to$ Mini-DAGs):** Deconstructs massive PRDs into milestone slices (max 4–6 tasks each), executing sequential mini-DAGs with isolated contract scopes and JIT dependency handoffs.
-- [ ] **Gate 3 (Human Acceptance & Live Verification Gate):** Pauses upon test completion for real human testing against live databases/servers, supporting incremental contract addendums (`02-contracts.addendum.md`) without breaking baseline frozen contracts.
-
-### ⚡ `v0.4.0` (Specialized Runtime Harnesses & Fast TDD Sandbox)
 - [ ] **Step 4 Isolated TDD Execution Sandbox:** Micro-loop runner with persistent in-memory test watching (Jest/Vitest/Pytest), sub-150ms execution, and auto-revert on uncompilable syntax/regressions.
 - [ ] **Heterogeneous Stage Compute:** Tailored agent sandboxes and model assignments per pipeline phase (e.g. Gemini 1M+ for Recon, Claude for Contracts, Qwen/DeepSeek for TDD builds).
 
-### 🔵 `v1.0.0` (Enterprise GA & Swarm Engine)
-- [ ] **Phase 4: Swarm Engine (Multi-Agent Loops):** Dynamic delegation of TDD and research tasks to specialized autonomous sub-agents with robust IPC messaging.
-- [ ] **Phase 5: Knowledge Graph RAG & Context Retrieval:** AST-driven deterministic graph generation (`ts-morph`) and semantic commit-lifecycle event tagging to solve LLM context window limits without staleness.
+### 🔵 `v1.0.0` (Enterprise GA & CI/CD Gatekeeper)
 - [ ] **Headless CI/CD GitHub Action:** Enforce contract compliance and run pre-flight gate verifiers on incoming Pull Requests automatically.
 - [ ] **Team Policy Cloud Sync:** Centralized synchronization of enterprise `.dagrules` across distributed engineering teams.
 
