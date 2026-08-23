@@ -1,6 +1,6 @@
-import { ProviderFactory } from '../../dist/infrastructure/llm/provider-factory.js';
-import { GetProviderForStageUseCase } from '../../dist/application/llm/get-provider-for-stage-use-case.js';
-import { ExecuteStagePromptUseCase } from '../../dist/application/llm/execute-stage-prompt-use-case.js';
+import { ProviderFactory } from '../../dist/src/infrastructure/llm/provider-factory.js';
+import { GetProviderForStageUseCase } from '../../dist/src/application/llm/get-provider-for-stage-use-case.js';
+import { ExecuteStagePromptUseCase } from '../../dist/src/application/llm/execute-stage-prompt-use-case.js';
 import { buildPrompt } from './prompts.js';
 
 const factory = new ProviderFactory();

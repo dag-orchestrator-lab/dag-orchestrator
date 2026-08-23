@@ -13,4 +13,4 @@ export {
   archiveFeatureWorkspace,
   unarchiveFeatureWorkspace,
   activateFeatureWorkspace
-} from '../dist/state.js';
+} from '../dist/src/state.js';
