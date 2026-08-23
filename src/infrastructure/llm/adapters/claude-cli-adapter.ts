@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import { ProviderExecutionError } from '../../../domain/llm/errors/provider-execution-error.js';
+import { LlmNetworkTimeoutError } from '../../../domain/llm/errors/llm-network-timeout-error.js';
 import type { LLMExecutionOptions } from '../../../domain/llm/types/llm-execution-options.js';
 import type { LLMProviderPort } from '../../../domain/llm/ports/llm-provider-port.js';
 import type { StageProviderConfig } from '../../../domain/llm/types/stage-provider-config.js';
@@ -42,7 +43,7 @@ export class ClaudeCliAdapter implements LLMProviderPort {
         settled = true;
         child.kill();
         reject(
-          new ProviderExecutionError(`Claude CLI timed out after ${timeoutMs}ms`, {
+          new LlmNetworkTimeoutError(`Claude CLI timed out after ${timeoutMs}ms`, {
             providerType: 'claude-cli',
           })
         );

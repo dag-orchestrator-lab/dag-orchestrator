@@ -7,6 +7,7 @@ import { PipelineStep } from '../../domain/cli/value-objects/pipeline-step.js';
 import { GitWorkingTreeStatus } from '../../domain/cli/value-objects/git-working-tree-status.js';
 import { DirtyTreeGuardPolicy } from '../../domain/cli/policies/dirty-tree-guard-policy.js';
 import { StepExecutionFailedError } from '../../domain/cli/errors.js';
+import { LlmNetworkTimeoutError } from '../../domain/llm/errors/llm-network-timeout-error.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -101,12 +102,17 @@ export class DefaultPipelineAdvancer implements PipelineAdvancer {
       try {
         const result = await this.executeStageUseCase.execute(stageName, prompt);
         if (result.isErr) {
-          throw new Error(result.error.message);
+          throw result.error;
         }
         await this.reportPostStepDirtyTree(stageName);
         return;
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
+        if (lastError instanceof LlmNetworkTimeoutError) {
+          console.warn(
+            `\x1b[33m⚠ LLM provider network timeout during ${stageName} (attempt ${attempt + 1}/${MAX_AUTO_HEAL_RETRIES + 1}); auto-healing.\x1b[0m`
+          );
+        }
       }
     }
 

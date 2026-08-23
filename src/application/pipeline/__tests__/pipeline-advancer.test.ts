@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Result } from '../../../domain/common/result.js';
 import { StepExecutionFailedError } from '../../../domain/cli/errors.js';
 import { ProviderExecutionError } from '../../../domain/llm/errors/provider-execution-error.js';
+import { LlmNetworkTimeoutError } from '../../../domain/llm/errors/llm-network-timeout-error.js';
 import { DefaultPipelineAdvancer } from '../pipeline-advancer.js';
 import type { GitAdapter } from '../../../infrastructure/process/git-adapter.js';
 import type { Prompter } from '../../../infrastructure/cli/readline-prompter.js';
@@ -185,6 +186,60 @@ describe('DefaultPipelineAdvancer', () => {
     await advancer.runStep4();
 
     expect(extractGitDiff).toHaveBeenCalledWith('/repo', 'develop');
+  });
+
+  it('catches a thrown LlmNetworkTimeoutError from ExecuteStagePromptUseCase and auto-heals via retry instead of crashing', async () => {
+    const gitAdapter = makeGitAdapter(true);
+    const prompter = makePrompter('y');
+    const execute = vi
+      .fn()
+      .mockRejectedValueOnce(new LlmNetworkTimeoutError('Claude CLI timed out after 120000ms'))
+      .mockResolvedValueOnce(Result.ok('ok'));
+
+    const advancer = new DefaultPipelineAdvancer(
+      gitAdapter,
+      prompter,
+      { execute } as unknown as ExecuteStagePromptUseCase,
+      '/repo'
+    );
+
+    await expect(advancer.runStep1()).resolves.toBeUndefined();
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it('surfaces a network timeout as a Result.err and still retries without crashing', async () => {
+    const gitAdapter = makeGitAdapter(true);
+    const prompter = makePrompter('y');
+    const execute = vi
+      .fn()
+      .mockResolvedValueOnce(Result.err(new LlmNetworkTimeoutError('Claude CLI timed out after 120000ms')))
+      .mockResolvedValueOnce(Result.ok('ok'));
+
+    const advancer = new DefaultPipelineAdvancer(
+      gitAdapter,
+      prompter,
+      { execute } as unknown as ExecuteStagePromptUseCase,
+      '/repo'
+    );
+
+    await expect(advancer.runStep2()).resolves.toBeUndefined();
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it('throws StepExecutionFailedError (not the raw timeout) once retries are exhausted on persistent timeouts', async () => {
+    const gitAdapter = makeGitAdapter(true);
+    const prompter = makePrompter('y');
+    const execute = vi.fn(async () => Result.err(new LlmNetworkTimeoutError('Claude CLI timed out after 120000ms')));
+
+    const advancer = new DefaultPipelineAdvancer(
+      gitAdapter,
+      prompter,
+      { execute } as unknown as ExecuteStagePromptUseCase,
+      '/repo'
+    );
+
+    await expect(advancer.runStep3()).rejects.toBeInstanceOf(StepExecutionFailedError);
+    expect(execute).toHaveBeenCalledTimes(2);
   });
 
   it('does not double-invoke execute for a single logical attempt (idempotent re-entry, invariant 3)', async () => {

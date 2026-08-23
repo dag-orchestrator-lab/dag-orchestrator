@@ -3,10 +3,12 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { ClaudeCliAdapter } from './claude-cli-adapter.js';
 import { ProviderExecutionError } from '../../../domain/llm/errors/provider-execution-error.js';
+import { LlmNetworkTimeoutError } from '../../../domain/llm/errors/llm-network-timeout-error.js';
 
 const FIXTURES_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '__fixtures__');
 const ECHO_STDIN_CLI = path.join(FIXTURES_DIR, 'echo-stdin-cli.cjs');
 const FAIL_CLI = path.join(FIXTURES_DIR, 'fail-cli.cjs');
+const HANG_CLI = path.join(FIXTURES_DIR, 'hang-cli.cjs');
 
 describe('ClaudeCliAdapter', () => {
   it('delivers the prompt via stdin, never as an argv element, and resolves with it', async () => {
@@ -43,5 +45,13 @@ describe('ClaudeCliAdapter', () => {
     });
 
     await expect(adapter.execute('prompt')).rejects.toBeInstanceOf(ProviderExecutionError);
+  }, 5000);
+
+  it('rejects with LlmNetworkTimeoutError (a ProviderExecutionError) when the CLI stalls past the timeout', async () => {
+    const adapter = new ClaudeCliAdapter({ cliPath: HANG_CLI, model: 'claude-cli-model' });
+
+    await expect(adapter.execute('prompt', undefined, { timeoutMs: 50 })).rejects.toBeInstanceOf(
+      LlmNetworkTimeoutError
+    );
   }, 5000);
 });
