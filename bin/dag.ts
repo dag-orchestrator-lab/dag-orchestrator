@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { Result } from '../src/domain/common/result.js';
 import type { WorkspaceResultError } from '../src/domain/common/errors.js';
 import { ExitCode } from '../src/domain/cli/value-objects/exit-code.js';
@@ -24,6 +26,11 @@ const DEFAULT_CONFIG_VERSION = '1.0.0';
 
 /** Default LLM provider offered by `dag init` when the user declines to type one. */
 const DEFAULT_LLM_PROVIDER = 'gemini';
+
+/** `.dag/config.json` stage key `dag commit` uses to resolve its LLM provider. */
+const COMMIT_STAGE_NAME = 'commit';
+
+const execFileAsync = promisify(execFile);
 
 /** Sentinel thrown once usage text has already been printed, so the top-level handler exits without re-logging. */
 class UsageAlreadyPrintedError extends Error {}
@@ -65,6 +72,7 @@ Commands:
   archive [name]        Archive a workspace (defaults to the active one)
   rollback [name]       Create a rollback snapshot (defaults to the active one)
   config [get|set k v]  Read or write .dag/config.json
+  commit                 Generate an AI commit message for the working tree diff and commit locally
   step0..step4          Run a pipeline stage with dirty-tree guard and auto-heal
 `);
 }
@@ -234,6 +242,66 @@ async function handleConfig(args: string[]): Promise<void> {
   throw new Error(`Unknown config subcommand: "${subcommand}"`);
 }
 
+/** @returns The full working-tree diff (staged + unstaged) against `HEAD`, or `''` if it could not be computed. */
+async function extractWorkingTreeDiff(): Promise<string> {
+  try {
+    const { stdout } = await execFileAsync('git', ['diff', 'HEAD'], { cwd });
+    return stdout;
+  } catch {
+    return '';
+  }
+}
+
+/** Stages the entire working tree so the committed content matches the diff the user reviewed. */
+async function stageAllChanges(): Promise<void> {
+  await execFileAsync('git', ['add', '-A'], { cwd });
+}
+
+async function createCommit(message: string): Promise<void> {
+  await execFileAsync('git', ['commit', '-m', message], { cwd });
+}
+
+/**
+ * Extracts the working tree diff, asks the LLM for a conventional commit message, then
+ * prompts the user to accept, edit, or abort before committing locally (never pushes).
+ */
+async function handleCommit(): Promise<void> {
+  const diff = await extractWorkingTreeDiff();
+  if (!diff.trim()) {
+    console.log('No changes to commit.');
+    return;
+  }
+
+  const prompt = `Generate a concise, conventional commit message for the following git diff. Respond with only the commit message, no explanation or code fences.\n\n${diff}`;
+  const result = await executeStageUseCase.execute(COMMIT_STAGE_NAME, prompt);
+  if (result.isErr) {
+    throw toDisplayError(result.error);
+  }
+
+  const generatedMessage = result.value.trim();
+  console.log('\nProposed commit message:\n');
+  console.log(generatedMessage);
+
+  const answer = await prompter.askQuestion('\nCommit with this message? (y/n/edit): ');
+  const normalized = answer.trim().toLowerCase();
+
+  let finalMessage = generatedMessage;
+  if (normalized === 'edit' || normalized === 'e') {
+    finalMessage = (await prompter.askMultiLine('Enter your commit message (blank line or --- to finish):')).trim();
+    if (!finalMessage) {
+      console.log('Commit aborted: empty message.');
+      return;
+    }
+  } else if (normalized !== 'y' && normalized !== 'yes') {
+    console.log('Commit aborted.');
+    return;
+  }
+
+  await stageAllChanges();
+  await createCommit(finalMessage);
+  console.log('✓ Commit created.');
+}
+
 async function handleStep(type: 'step0' | 'step1' | 'step2' | 'step3' | 'step4'): Promise<void> {
   switch (type) {
     case 'step0':
@@ -271,6 +339,8 @@ async function dispatch(parsed: ParsedCommand): Promise<void> {
       return handleRollback(parsed.args[0]);
     case 'config':
       return handleConfig(parsed.args);
+    case 'commit':
+      return handleCommit();
     case 'step0':
     case 'step1':
     case 'step2':

@@ -23,7 +23,7 @@ describe('CliParser.parse', () => {
     expect(result).toEqual({ type: 'unknown', args: [], flags: {}, rawCommand: '' });
   });
 
-  it.each(['init', 'doctor', 'features', 'new', 'archive', 'rollback', 'config', 'step0', 'step1', 'step2', 'step3', 'step4'])(
+  it.each(['init', 'doctor', 'features', 'new', 'archive', 'rollback', 'config', 'commit', 'step0', 'step1', 'step2', 'step3', 'step4'])(
     'recognizes command %s',
     (command) => {
       const result = CliParser.parse(['node', 'dag', command]);

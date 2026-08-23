@@ -9,6 +9,7 @@ export type CommandType =
   | 'archive'
   | 'rollback'
   | 'config'
+  | 'commit'
   | 'step'
   | 'unknown';
 

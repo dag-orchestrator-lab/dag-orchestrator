@@ -7,6 +7,7 @@ export type CommandType =
   | 'archive'
   | 'rollback'
   | 'config'
+  | 'commit'
   | 'step0'
   | 'step1'
   | 'step2'
@@ -23,7 +24,7 @@ export interface ParsedCommand {
 
 const KNOWN_COMMANDS: readonly CommandType[] = [
   'init', 'doctor', 'features', 'plan', 'new', 'archive',
-  'rollback', 'config', 'step0', 'step1', 'step2', 'step3', 'step4',
+  'rollback', 'config', 'commit', 'step0', 'step1', 'step2', 'step3', 'step4',
 ];
 
 /** Zero-dependency parser mapping raw process.argv into a typed ParsedCommand. */
