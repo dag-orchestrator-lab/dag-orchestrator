@@ -113,6 +113,7 @@ dag init
 | `dag implement` (or `code`) | Step 3: Implement next task with tests-first TDD & auto-healing test loop |
 | `dag review` (or `audit`) | Step 4: Whole-repo impact check & produce `REVIEW.md` |
 | `dag run "<prompt>"` | Execute the entire pipeline end-to-end with interactive gate stops |
+| `dag commit` | AI-assisted atomic commit generator from git diff (with confirmation) |
 | `dag ship [title]` | Clean AI-synthesized Confluence PR generator, auto-branching, & auto-promotion |
 | `dag rollback <step>` | Safely rewind to a previous stage with automatic backup snapshot |
 | `dag clean` | Reset pipeline and backup all generated artifacts |
@@ -158,7 +159,7 @@ The DAG Orchestrator roadmap is designed around increasing IDE integration, mult
 - [x] **Rule Sync & Port Engine:** Bi-directional merging (`dag rules sync`) and source-clearing transfers (`dag rules port`).
 - [x] **Custom PR Templates & Conventions:** Native template inheritance with DAG contract & audit placeholder substitution.
 - [x] **Smart Rebase & Interactive Ship Flow:** Auto-suggests conventional commit titles and handles non-fast-forward git rebase recovery automatically.
-- [ ] **TypeScript Porting:** Complete strict TypeScript migration with full type definitions (`.d.ts`).
+- [x] **TypeScript Porting (Phase 3):** Complete strict TypeScript migration for the entire orchestrator, value objects, and CLI router.
 
 ### 🟣 `v0.3.0` (Double-Diamond Design Mode & Vertical Feature Slicing)
 - [ ] **`dag design` (Exploratory Problem Harness):** Divergent exploration engine generating user persona journeys (`00-personas.md`), candidate architectural trade-offs (`00-tradeoffs.md`), and locked problem statements before code execution.
@@ -170,9 +171,9 @@ The DAG Orchestrator roadmap is designed around increasing IDE integration, mult
 - [ ] **Step 4 Isolated TDD Execution Sandbox:** Micro-loop runner with persistent in-memory test watching (Jest/Vitest/Pytest), sub-150ms execution, and auto-revert on uncompilable syntax/regressions.
 - [ ] **Heterogeneous Stage Compute:** Tailored agent sandboxes and model assignments per pipeline phase (e.g. Gemini 1M+ for Recon, Claude for Contracts, Qwen/DeepSeek for TDD builds).
 
-### 🔵 `v1.0.0` (Enterprise GA & CI/CD Gatekeeper)
-- [ ] **Step 1 Deep Recon LSP Harness:** AST symbol graph analysis and whole-repo cross-reference indexing without context pollution.
-- [ ] **Step 3 Adversarial Red-Team Fuzzing:** Mutation testing simulator generating property-based edge cases against active contracts.
+### 🔵 `v1.0.0` (Enterprise GA & Swarm Engine)
+- [ ] **Phase 4: Swarm Engine (Multi-Agent Loops):** Dynamic delegation of TDD and research tasks to specialized autonomous sub-agents with robust IPC messaging.
+- [ ] **Phase 5: Knowledge Graph RAG & Context Retrieval:** AST-driven deterministic graph generation (`ts-morph`) and semantic commit-lifecycle event tagging to solve LLM context window limits without staleness.
 - [ ] **Headless CI/CD GitHub Action:** Enforce contract compliance and run pre-flight gate verifiers on incoming Pull Requests automatically.
 - [ ] **Team Policy Cloud Sync:** Centralized synchronization of enterprise `.dagrules` across distributed engineering teams.
 
