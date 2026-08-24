@@ -190,11 +190,13 @@ async function handlePlanOrNew(targetName: string): Promise<void> {
   }
 
   if (workspaceExists(targetName)) {
+    saveLocalConfigUpdates({ ACTIVE_FEATURE: targetName });
     console.log(`Resuming existing workspace "${targetName}".`);
     return;
   }
 
   unwrapOrThrow(workspaceService.saveFeatureContextMeta(targetName, {}));
+  saveLocalConfigUpdates({ ACTIVE_FEATURE: targetName });
   console.log(`Created workspace "${targetName}".`);
 }
 
