@@ -6,6 +6,7 @@ import {
 } from '../validation/invariants.js';
 import { PipelineStage } from '../../feature-workspace/entities/pipeline-stage.js';
 import type { FilePresenceCheckerPort } from '../ports/file-presence-checker-port.js';
+import type { IpcBusPort } from '../ports/ipc-bus-port.js';
 import type { StageCompleteEvent } from '../events/stage-complete-event.js';
 
 class StubFilePresenceChecker implements FilePresenceCheckerPort {
@@ -142,5 +143,18 @@ describe('validateStageCompleteEvent', () => {
     const result = validateStageCompleteEvent(baseEvent);
 
     expect(result.isOk).toBe(true);
+  });
+});
+
+describe('IpcBusPort subscribe type-safety', () => {
+  it('rejects subscribing to an unknown event name at compile time', () => {
+    // Type-only check, never invoked at runtime — a compile failure here means Invariant 5's type hole reopened.
+    function assertSubscribeIsTypeSafe(bus: IpcBusPort): void {
+      // @ts-expect-error — 'NOT_A_REAL_EVENT' is not a key of OrchestrationEventMap, so this must not compile.
+      bus.subscribe('NOT_A_REAL_EVENT', () => {});
+    }
+    void assertSubscribeIsTypeSafe;
+
+    expect(true).toBe(true);
   });
 });
