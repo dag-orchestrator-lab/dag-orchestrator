@@ -1,7 +1,7 @@
-import { isAbsolute } from 'node:path';
 import { Result } from '../../common/result.js';
 import { PipelineStage } from '../../feature-workspace/entities/pipeline-stage.js';
 import { ContextValidationError } from '../errors/context-validation-error.js';
+import { isAbsolutePath } from '../validation/invariants.js';
 import type { ArtifactReference } from './artifact-reference.js';
 import type { FilePresenceCheckerPort } from '../ports/file-presence-checker-port.js';
 
@@ -34,7 +34,7 @@ export class AgentContext {
     props: AgentContextProps,
     filePresenceChecker: FilePresenceCheckerPort
   ): Result<AgentContext, ContextValidationError> {
-    if (!isAbsolute(props.workingDirectory)) {
+    if (!isAbsolutePath(props.workingDirectory)) {
       return Result.err(
         new ContextValidationError(
           `AgentContext.workingDirectory must be an absolute path, got '${props.workingDirectory}'`,
@@ -44,7 +44,7 @@ export class AgentContext {
     }
 
     for (const ref of props.artifactRefs) {
-      if (!isAbsolute(ref.absolutePath) || !filePresenceChecker.existsSync(ref.absolutePath)) {
+      if (!isAbsolutePath(ref.absolutePath) || !filePresenceChecker.existsSync(ref.absolutePath)) {
         return Result.err(
           new ContextValidationError(
             `AgentContext.artifactRefs entry for stage '${ref.stageId}' must be an absolute path to an existing file, got '${ref.absolutePath}'`,
