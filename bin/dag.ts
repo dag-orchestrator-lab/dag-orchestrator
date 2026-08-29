@@ -308,7 +308,7 @@ async function handleConfig(args: string[]): Promise<void> {
 /** @returns The full working-tree diff (staged + unstaged) against `HEAD`, or `''` if it could not be computed. */
 async function extractWorkingTreeDiff(): Promise<string> {
   try {
-    const { stdout } = await execFileAsync('git', ['add', '-N', '.'], { cwd });
+    await execFileAsync('git', ['add', '-N', '.'], { cwd });
     const { stdout } = await execFileAsync('git', ['diff', 'HEAD'], { cwd });
     return stdout;
   } catch {
