@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events';
 import { Result } from '../../domain/common/result.js';
 import { EventValidationError } from '../../domain/orchestration/errors/event-validation-error.js';
 import { validateStageCompleteEvent } from '../../domain/orchestration/validation/invariants.js';
+import { STAGE_COMPLETE_EVENT_NAME } from '../../domain/orchestration/events/stage-complete-event.js';
 import type { OrchestrationEventMap, OrchestrationEventName } from '../../domain/orchestration/events/event-map.js';
 import type { IpcBusPort, UnsubscribeFn } from '../../domain/orchestration/ports/ipc-bus-port.js';
 
@@ -14,7 +15,7 @@ const EVENT_VALIDATORS: {
     payload: OrchestrationEventMap[K]
   ) => Result<void, EventValidationError>;
 } = {
-  STAGE_COMPLETE: validateStageCompleteEvent,
+  [STAGE_COMPLETE_EVENT_NAME]: validateStageCompleteEvent,
 };
 
 /** In-process, in-memory typed pub/sub bus. No cross-process transport — see contract. */

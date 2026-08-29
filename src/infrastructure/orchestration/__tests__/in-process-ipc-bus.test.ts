@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { InProcessIpcBus } from '../in-process-ipc-bus.js';
-import type { StageCompleteEvent } from '../../../domain/orchestration/events/stage-complete-event.js';
+import { STAGE_COMPLETE_EVENT_NAME, type StageCompleteEvent } from '../../../domain/orchestration/events/stage-complete-event.js';
 
 function makeEvent(overrides: Partial<StageCompleteEvent> = {}): StageCompleteEvent {
   return {
-    detailType: 'STAGE_COMPLETE',
-    source: 'recon',
-    artifactAbsolutePath: '/tmp/feature/01-recon.md',
-    occurredAt: '2026-08-24T00:00:00.000Z',
+    role: 'recon',
+    workspaceSlug: 'epic-2-agents',
+    artifactPath: '/tmp/feature/01-recon.md',
+    timestamp: '2026-08-24T00:00:00.000Z',
     ...overrides,
   };
 }
@@ -16,9 +16,9 @@ describe('InProcessIpcBus', () => {
   it('delivers a valid payload to a subscriber', () => {
     const bus = new InProcessIpcBus();
     const handler = vi.fn();
-    bus.subscribe('STAGE_COMPLETE', handler);
+    bus.subscribe(STAGE_COMPLETE_EVENT_NAME, handler);
 
-    const result = bus.publish('STAGE_COMPLETE', makeEvent());
+    const result = bus.publish(STAGE_COMPLETE_EVENT_NAME, makeEvent());
 
     expect(result.isOk).toBe(true);
     expect(handler).toHaveBeenCalledWith(makeEvent());
@@ -27,9 +27,9 @@ describe('InProcessIpcBus', () => {
   it('rejects a relative artifactAbsolutePath without throwing and without dispatching', () => {
     const bus = new InProcessIpcBus();
     const handler = vi.fn();
-    bus.subscribe('STAGE_COMPLETE', handler);
+    bus.subscribe(STAGE_COMPLETE_EVENT_NAME, handler);
 
-    const result = bus.publish('STAGE_COMPLETE', makeEvent({ artifactAbsolutePath: 'relative/path.md' }));
+    const result = bus.publish(STAGE_COMPLETE_EVENT_NAME, makeEvent({ artifactPath: 'relative/path.md' }));
 
     expect(result.isErr).toBe(true);
     if (result.isErr) {
@@ -41,9 +41,9 @@ describe('InProcessIpcBus', () => {
   it('rejects an empty artifactAbsolutePath without throwing and without dispatching', () => {
     const bus = new InProcessIpcBus();
     const handler = vi.fn();
-    bus.subscribe('STAGE_COMPLETE', handler);
+    bus.subscribe(STAGE_COMPLETE_EVENT_NAME, handler);
 
-    const result = bus.publish('STAGE_COMPLETE', makeEvent({ artifactAbsolutePath: '' }));
+    const result = bus.publish(STAGE_COMPLETE_EVENT_NAME, makeEvent({ artifactPath: '' }));
 
     expect(result.isErr).toBe(true);
     if (result.isErr) {
@@ -55,10 +55,10 @@ describe('InProcessIpcBus', () => {
   it('accepts a Windows-style absolute path regardless of host OS', () => {
     const bus = new InProcessIpcBus();
     const handler = vi.fn();
-    bus.subscribe('STAGE_COMPLETE', handler);
+    bus.subscribe(STAGE_COMPLETE_EVENT_NAME, handler);
 
-    const event = makeEvent({ artifactAbsolutePath: 'C:\\foo\\bar.md' });
-    const result = bus.publish('STAGE_COMPLETE', event);
+    const event = makeEvent({ artifactPath: 'C:\\foo\\bar.md' });
+    const result = bus.publish(STAGE_COMPLETE_EVENT_NAME, event);
 
     expect(result.isOk).toBe(true);
     expect(handler).toHaveBeenCalledWith(event);
@@ -70,10 +70,10 @@ describe('InProcessIpcBus', () => {
       throw new Error('sync boom');
     });
     const healthy = vi.fn();
-    bus.subscribe('STAGE_COMPLETE', throwing);
-    bus.subscribe('STAGE_COMPLETE', healthy);
+    bus.subscribe(STAGE_COMPLETE_EVENT_NAME, throwing);
+    bus.subscribe(STAGE_COMPLETE_EVENT_NAME, healthy);
 
-    expect(() => bus.publish('STAGE_COMPLETE', makeEvent())).not.toThrow();
+    expect(() => bus.publish(STAGE_COMPLETE_EVENT_NAME, makeEvent())).not.toThrow();
     expect(healthy).toHaveBeenCalled();
   });
 
@@ -83,14 +83,14 @@ describe('InProcessIpcBus', () => {
       throw new Error('async boom');
     });
     const healthy = vi.fn();
-    bus.subscribe('STAGE_COMPLETE', rejecting);
-    bus.subscribe('STAGE_COMPLETE', healthy);
+    bus.subscribe(STAGE_COMPLETE_EVENT_NAME, rejecting);
+    bus.subscribe(STAGE_COMPLETE_EVENT_NAME, healthy);
 
     const unhandledRejectionHandler = vi.fn();
     process.on('unhandledRejection', unhandledRejectionHandler);
 
     try {
-      expect(() => bus.publish('STAGE_COMPLETE', makeEvent())).not.toThrow();
+      expect(() => bus.publish(STAGE_COMPLETE_EVENT_NAME, makeEvent())).not.toThrow();
       expect(healthy).toHaveBeenCalled();
 
       // Let the rejected promise's microtask queue (and any unhandledRejection tick) flush.
@@ -106,11 +106,11 @@ describe('InProcessIpcBus', () => {
     const bus = new InProcessIpcBus();
     const first = vi.fn();
     const second = vi.fn();
-    const unsubscribeFirst = bus.subscribe('STAGE_COMPLETE', first);
-    bus.subscribe('STAGE_COMPLETE', second);
+    const unsubscribeFirst = bus.subscribe(STAGE_COMPLETE_EVENT_NAME, first);
+    bus.subscribe(STAGE_COMPLETE_EVENT_NAME, second);
 
     unsubscribeFirst();
-    bus.publish('STAGE_COMPLETE', makeEvent());
+    bus.publish(STAGE_COMPLETE_EVENT_NAME, makeEvent());
 
     expect(first).not.toHaveBeenCalled();
     expect(second).toHaveBeenCalled();

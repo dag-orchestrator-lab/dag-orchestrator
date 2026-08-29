@@ -1,28 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import {
-  createAgentContext,
-  isAbsolutePath,
-  validateStageCompleteEvent,
-} from '../validation/invariants.js';
-import { PipelineStage } from '../../feature-workspace/entities/pipeline-stage.js';
-import type { FilePresenceCheckerPort } from '../ports/file-presence-checker-port.js';
+import { isAbsolutePath, validateStageCompleteEvent } from '../validation/invariants.js';
 import type { IpcBusPort } from '../ports/ipc-bus-port.js';
 import type { StageCompleteEvent } from '../events/stage-complete-event.js';
-
-class StubFilePresenceChecker implements FilePresenceCheckerPort {
-  constructor(private readonly existingPaths: ReadonlySet<string>) {}
-
-  existsSync(absolutePath: string): boolean {
-    return this.existingPaths.has(absolutePath);
-  }
-}
-
-function requireOk(stage: ReturnType<typeof PipelineStage.create>): PipelineStage {
-  if (stage.isErr) {
-    throw new Error('expected PipelineStage.create to succeed');
-  }
-  return stage.value;
-}
 
 describe('isAbsolutePath', () => {
   it('accepts POSIX absolute paths', () => {
@@ -45,72 +24,16 @@ describe('isAbsolutePath', () => {
   });
 });
 
-describe('createAgentContext', () => {
-  const pipelineState = requireOk(PipelineStage.create({ name: 'recon', requiredGates: [] }));
-
-  it('rejects a relative workingDirectory', () => {
-    const checker = new StubFilePresenceChecker(new Set());
-
-    const result = createAgentContext(
-      {
-        pipelineState,
-        workingDirectory: 'relative/dir',
-        artifactRefs: [],
-      },
-      checker
-    );
-
-    expect(result.isErr).toBe(true);
-    if (result.isErr) {
-      expect(result.error.code).toBe('RELATIVE_WORKING_DIRECTORY');
-    }
-  });
-
-  it('rejects an artifact reference missing on disk', () => {
-    const checker = new StubFilePresenceChecker(new Set());
-
-    const result = createAgentContext(
-      {
-        pipelineState,
-        workingDirectory: '/tmp/workdir',
-        artifactRefs: [{ stageId: 'recon', absolutePath: '/tmp/workdir/01-recon.md' }],
-      },
-      checker
-    );
-
-    expect(result.isErr).toBe(true);
-    if (result.isErr) {
-      expect(result.error.code).toBe('INVALID_ARTIFACT_REF');
-    }
-  });
-
-  it('accepts an absolute workingDirectory and existing artifact refs', () => {
-    const artifactPath = '/tmp/workdir/01-recon.md';
-    const checker = new StubFilePresenceChecker(new Set([artifactPath]));
-
-    const result = createAgentContext(
-      {
-        pipelineState,
-        workingDirectory: '/tmp/workdir',
-        artifactRefs: [{ stageId: 'recon', absolutePath: artifactPath }],
-      },
-      checker
-    );
-
-    expect(result.isOk).toBe(true);
-  });
-});
-
 describe('validateStageCompleteEvent', () => {
   const baseEvent: StageCompleteEvent = {
-    detailType: 'STAGE_COMPLETE',
-    source: 'recon',
-    artifactAbsolutePath: '/tmp/workdir/01-recon.md',
-    occurredAt: new Date().toISOString(),
+    role: 'recon',
+    workspaceSlug: 'epic-2-agents',
+    artifactPath: '/tmp/workdir/01-recon.md',
+    timestamp: new Date().toISOString(),
   };
 
-  it('rejects an empty artifactAbsolutePath', () => {
-    const result = validateStageCompleteEvent({ ...baseEvent, artifactAbsolutePath: '' });
+  it('rejects an empty artifactPath', () => {
+    const result = validateStageCompleteEvent({ ...baseEvent, artifactPath: '' });
 
     expect(result.isErr).toBe(true);
     if (result.isErr) {
@@ -118,10 +41,10 @@ describe('validateStageCompleteEvent', () => {
     }
   });
 
-  it('rejects a relative artifactAbsolutePath', () => {
+  it('rejects a relative artifactPath', () => {
     const result = validateStageCompleteEvent({
       ...baseEvent,
-      artifactAbsolutePath: 'relative/01-recon.md',
+      artifactPath: 'relative/01-recon.md',
     });
 
     expect(result.isErr).toBe(true);
@@ -130,16 +53,16 @@ describe('validateStageCompleteEvent', () => {
     }
   });
 
-  it('accepts a Windows-style absolute artifactAbsolutePath regardless of host OS', () => {
+  it('accepts a Windows-style absolute artifactPath regardless of host OS', () => {
     const result = validateStageCompleteEvent({
       ...baseEvent,
-      artifactAbsolutePath: 'C:\\Users\\foo\\01-recon.md',
+      artifactPath: 'C:\\Users\\foo\\01-recon.md',
     });
 
     expect(result.isOk).toBe(true);
   });
 
-  it('accepts a POSIX absolute artifactAbsolutePath', () => {
+  it('accepts a POSIX absolute artifactPath', () => {
     const result = validateStageCompleteEvent(baseEvent);
 
     expect(result.isOk).toBe(true);

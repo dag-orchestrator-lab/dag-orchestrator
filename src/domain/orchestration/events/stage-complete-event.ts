@@ -1,9 +1,12 @@
-import type { PipelineStageId } from '../models/pipeline-stage-id.js';
+import type { AgentRole } from '../models/agent-role.js';
+
+/** Bus name a Sub-Agent publishes on after producing its artifact — the only event this feature emits. */
+export const STAGE_COMPLETE_EVENT_NAME = 'orchestration.stage.complete';
 
 /** Published when a Sub-Agent finishes, carrying the absolute path to the artifact it produced. */
 export interface StageCompleteEvent {
-  readonly detailType: 'STAGE_COMPLETE';
-  readonly source: PipelineStageId;
-  readonly artifactAbsolutePath: string;
-  readonly occurredAt: string;
+  readonly role: AgentRole;
+  readonly workspaceSlug: string;
+  readonly artifactPath: string;
+  readonly timestamp: string;
 }

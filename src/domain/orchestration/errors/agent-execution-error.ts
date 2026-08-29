@@ -1,25 +1,19 @@
 import { DomainError } from '../../common/errors.js';
-import type { PipelineStageId } from '../models/pipeline-stage-id.js';
+import type { AgentRole } from '../models/agent-role.js';
 
-export interface ErrorCauseDetails {
-  readonly name: string;
-  readonly message: string;
-  readonly stack?: string;
-}
-
-/** Raised when a Sub-Agent's execute() encounters an unexpected failure, returned inside AgentResult rather than thrown. */
+/** Raised when a Sub-Agent's execute() encounters an unexpected or unrecoverable failure. */
 export class AgentExecutionError extends DomainError {
-  readonly stageId: PipelineStageId;
-  readonly causeDetails?: ErrorCauseDetails;
-
   constructor(
-    stageId: PipelineStageId,
+    public readonly role: AgentRole,
+    public readonly workspaceSlug: string,
+    public readonly cycle: number | undefined,
     message: string,
-    causeDetails?: ErrorCauseDetails
+    public readonly cause?: unknown
   ) {
-    super(`Sub-Agent execution failed for stage '${stageId}': ${message}`);
+    super(
+      `Sub-Agent execution failed [role=${role}, workspaceSlug=${workspaceSlug}, cycle=${cycle ?? 'n/a'}]: ${message}`
+    );
     this.name = 'AgentExecutionError';
-    this.stageId = stageId;
-    this.causeDetails = causeDetails;
+    Object.setPrototypeOf(this, AgentExecutionError.prototype);
   }
 }
