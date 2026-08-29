@@ -45,7 +45,7 @@ export function slugify(input: string): string {
 // ---------------------------------------------------------
 
 function resolveSlug(cwdOrSlug?: string): string {
-  if (cwdOrSlug && !cwdOrSlug.includes('/') && !cwdOrSlug.includes('\\')) {
+  if (typeof cwdOrSlug === 'string' && !cwdOrSlug.includes('/') && !cwdOrSlug.includes('\\')) {
     return cwdOrSlug;
   }
   const cwd = cwdOrSlug || process.cwd();

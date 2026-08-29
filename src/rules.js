@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 
-const MAX_RULES_BYTES = 4096; // 4KB guard against prompt bloat
+const MAX_RULES_BYTES = 32768; // 4KB guard against prompt bloat
 
 export const RULE_PRESETS = {
   'typescript': {
@@ -118,7 +118,7 @@ export function loadProjectRules(cwd = process.cwd()) {
           foundRules.push(content);
           foundSources.push(item.label);
         }
-      } catch (e) {}
+      } catch {}
     }
   }
 
@@ -163,7 +163,7 @@ export function appendLearnedRule(feedbackText, category = 'General', isLocal = 
   if (fs.existsSync(rulePath)) {
     try {
       currentContent = fs.readFileSync(rulePath, 'utf8').trim();
-    } catch (e) {}
+    } catch {}
   } else {
     currentContent = isLocal ? '# Local Developer Rules (Gitignored)\n' : '# Team Engineering Policies & Architecture Rules\n';
   }
@@ -201,7 +201,7 @@ export function extractConventionsFromRecon(reconText = '') {
   if (!conventionsMatch || !conventionsMatch[1]) return [];
 
   const rawLines = conventionsMatch[1].split('\n')
-    .map(l => l.replace(/^[\s\*\-\d\.\)]+/, '').trim())
+    .map(l => l.replace(/^[\s*\-\d.)]+/, '').trim())
     .filter(l => l.length > 15 && !l.toLowerCase().startsWith('what conventions') && !l.toLowerCase().includes('every claim carries'));
 
   // Return up to 4 top unique conventions

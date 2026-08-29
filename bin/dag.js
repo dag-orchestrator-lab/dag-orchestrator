@@ -23,19 +23,17 @@ import {
   unarchiveFeatureWorkspace,
   activateFeatureWorkspace,
   listArchivedFeatures,
-  getFeatureContextMeta,
-  saveFeatureContextMeta,
-  recordGateApproval, 
+  recordGateApproval,
   resolveArtifactPath, 
   getFeatureWorkspaceDir, 
   listAllFeatures, 
   slugify 
 } from '../src/state.js';
-import { recordStageMetrics, getFeatureBenchmark } from '../src/metrics.js';
+import { getFeatureBenchmark } from '../src/metrics.js';
 import { loadProjectRules, formatRulesForPrompt, appendLearnedRule, extractConventionsFromRecon, RULE_PRESETS, applyRulePreset, syncRules, portRules } from '../src/rules.js';
 import { verifyContractSpec, verifyTaskList, renderVerificationReport, verifyFullPipeline } from '../src/verifier.js';
 import { linkService, unlinkService, harvestAllLinkedServices, renderServicesList } from '../src/services.js';
-import { isFrontendTask, processUIDesignReference, formatUIContractSection } from '../src/ui-design.js';
+import { isFrontendTask, processUIDesignReference } from '../src/ui-design.js';
 import { banner, logStep, logSuccess, logWarning, logError, logGate, renderStatusCard, ANSI } from '../src/ui.js';
 import { getProviderForStage, executeStagePrompt } from '../src/providers/index.js';
 import { geminiPromptRefine, geminiConsultArchitect } from '../src/gemini.js';
@@ -1041,7 +1039,7 @@ Format your output cleanly.`;
           const trimmed = action.trim();
 
           if (!trimmed || trimmed.toLowerCase() === 'y' || trimmed.toLowerCase() === 'yes') {
-            const { backupDir } = createRollbackSnapshot(1);
+            const { backupDir } = createRollbackSnapshot();
             logSuccess(`Created backup in ${backupDir} and rewound to Step 1.`);
             logStep('Regenerating 02-contracts.md with AI recommendation...', 'DAG Engine', 'Step 1');
             
@@ -1087,7 +1085,7 @@ Format your output cleanly.`;
             return;
           } else {
             // User typed custom instructions!
-            const { backupDir } = createRollbackSnapshot(1);
+            const { backupDir } = createRollbackSnapshot();
             logSuccess(`Created backup in ${backupDir} and rewound to Step 1 with your custom instructions.`);
             await runStep1();
             return;
