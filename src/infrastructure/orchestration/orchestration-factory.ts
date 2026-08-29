@@ -5,7 +5,7 @@ let sharedIpcBus: IpcBusPort | undefined;
 
 /**
  * Provides the process-wide shared `IpcBus` instance, constructing it lazily on first access.
- * Exists so a future epic's DI wiring has one place to obtain the shared bus.
+ * Note: Must be reset via `resetIpcBus()` between test cases to ensure test isolation.
  * @returns the shared `IpcBusPort` instance
  */
 export function getIpcBus(): IpcBusPort {
@@ -19,8 +19,3 @@ export function getIpcBus(): IpcBusPort {
 export function resetIpcBus(): void {
   sharedIpcBus = undefined;
 }
-
-export const OrchestrationFactory = {
-  getIpcBus,
-  resetIpcBus,
-};
