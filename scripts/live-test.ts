@@ -1,11 +1,11 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { GeminiAdapter } from './src/infrastructure/llm/adapters/gemini-adapter.js';
-import { ReconAgent, ArchitectAgent, SkepticAgent, WorkspaceFileSystemAdapter, InProcessIpcBus } from './src/infrastructure/orchestration/index.js';
-import type { LlmClientPort, LlmCompletionOptions } from './src/domain/orchestration/ports/llm-client-port.js';
-import type { LLMProviderPort } from './src/domain/orchestration/ports/llm-provider-port.js';
-import { AgentContext } from './src/domain/orchestration/models/agent-context.js';
-import { ContractFeedbackRecord } from './src/domain/orchestration/models/contract-feedback-record.js';
+import { GeminiAdapter } from '../src/infrastructure/llm/adapters/gemini-adapter.js';
+import { ReconAgent, ArchitectAgent, SkepticAgent, WorkspaceFileSystemAdapter, InProcessIpcBus } from '../src/infrastructure/orchestration/index.js';
+import type { LlmClientPort, LlmCompletionOptions } from '../src/domain/orchestration/ports/llm-client-port.js';
+import type { LLMProviderPort } from '../src/domain/orchestration/ports/llm-provider-port.js';
+import { AgentContext } from '../src/domain/orchestration/models/agent-context.js';
+import { ContractFeedbackRecord } from '../src/domain/orchestration/models/contract-feedback-record.js';
 
 class LlmAdapterWrapper implements LlmClientPort {
   constructor(private readonly provider: LLMProviderPort) {}
@@ -65,7 +65,7 @@ async function run() {
     const feedback: ContractFeedbackRecord = { cycle, findings: result.feedback!.findings };
     await fsAdapter.writeFeedbackRecord(slug, cycle, JSON.stringify(feedback));
     
-    context = { ...context, pendingFeedback: feedback };
+    context = { ...context, pendingFeedback: context.pendingFeedback ? [...context.pendingFeedback, feedback] : [feedback] };
     await architectAgent.execute(context);
     
     console.log(`--- Running Skeptic Agent (Audit ${cycle}) ---`);
