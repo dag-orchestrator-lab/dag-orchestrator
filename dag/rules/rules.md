@@ -33,3 +33,4 @@
 ## 6. Pluggable Rules Conformance
 - **Two-Tier Conformance Evaluator**: Support fast deterministic AST/syntax plugins (`no-explicit-any`, `onion-domain-purity`, `db-expand-contract`) as well as semantic model-driven audits.
 - **Pluggable Architecture**: Conformance checkers must implement the standard `ConformancePlugin` interface, configurable per repository via `.dag/config.json` with customizable severity (`BLOCKER`, `WARNING`, `DISABLED`).
+- [Task Planning] You broke the markdown format. Output strictly ONLY the markdown for 05-tasks.md. Every task must use the format '### [ ] T-X <title>' and include Depends on:, Lane:, Files:, Done when:, and Check: (with the test command). Do not include conversational filler.
