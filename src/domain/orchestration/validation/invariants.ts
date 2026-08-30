@@ -48,3 +48,12 @@ export function validateStageCompleteEvent(
 
   return Result.ok(undefined);
 }
+
+/**
+ * Placeholder validator for events with no invariant defined yet in this codebase.
+ * @param _event Event payload; unused until a real invariant is introduced for it.
+ * @returns Always `Result.ok(undefined)`.
+ */
+export function validateNoOp<T>(_event: T): Result<void, EventValidationError> {
+  return Result.ok(undefined);
+}

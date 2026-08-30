@@ -1,0 +1,8 @@
+{
+  "verify": {
+    "typecheck": {
+      "executable": "pnpm",
+      "args": ["typecheck"]
+    }
+  }
+}

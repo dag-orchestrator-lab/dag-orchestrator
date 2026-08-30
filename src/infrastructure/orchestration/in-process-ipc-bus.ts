@@ -1,8 +1,12 @@
 import { EventEmitter } from 'node:events';
 import { Result } from '../../domain/common/result.js';
 import { EventValidationError } from '../../domain/orchestration/errors/event-validation-error.js';
-import { validateStageCompleteEvent } from '../../domain/orchestration/validation/invariants.js';
+import { validateNoOp, validateStageCompleteEvent } from '../../domain/orchestration/validation/invariants.js';
 import { STAGE_COMPLETE_EVENT_NAME } from '../../domain/orchestration/events/stage-complete-event.js';
+import { CODER_TASK_STARTED_EVENT_NAME, CODER_TASK_VERIFIED_EVENT_NAME } from '../../domain/orchestration/events/coder-events.js';
+import { FIXER_PATCH_APPLIED_EVENT_NAME, FIXER_RETRIES_EXHAUSTED_EVENT_NAME } from '../../domain/orchestration/events/fixer-events.js';
+import { REVIEW_COMPLETED_EVENT_NAME, CONTRACT_ADDENDUM_CREATED_EVENT_NAME } from '../../domain/orchestration/events/reviewer-events.js';
+import { GATE4_PAUSED_EVENT_NAME } from '../../domain/orchestration/events/pipeline-events.js';
 import type { OrchestrationEventMap, OrchestrationEventName } from '../../domain/orchestration/events/event-map.js';
 import type { IpcBusPort, UnsubscribeFn } from '../../domain/orchestration/ports/ipc-bus-port.js';
 
@@ -16,6 +20,13 @@ const EVENT_VALIDATORS: {
   ) => Result<void, EventValidationError>;
 } = {
   [STAGE_COMPLETE_EVENT_NAME]: validateStageCompleteEvent,
+  [CODER_TASK_STARTED_EVENT_NAME]: validateNoOp,
+  [CODER_TASK_VERIFIED_EVENT_NAME]: validateNoOp,
+  [FIXER_PATCH_APPLIED_EVENT_NAME]: validateNoOp,
+  [FIXER_RETRIES_EXHAUSTED_EVENT_NAME]: validateNoOp,
+  [REVIEW_COMPLETED_EVENT_NAME]: validateNoOp,
+  [CONTRACT_ADDENDUM_CREATED_EVENT_NAME]: validateNoOp,
+  [GATE4_PAUSED_EVENT_NAME]: validateNoOp,
 };
 
 /** In-process, in-memory typed pub/sub bus. No cross-process transport — see contract. */
