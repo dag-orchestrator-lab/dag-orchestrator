@@ -26,7 +26,7 @@ function createWorkspaceFileSystem(overrides: Partial<WorkspaceFileSystemPort> =
 
 function createLlmClient(overrides: Partial<LlmClientPort> = {}): LlmClientPort {
   return {
-    complete: vi.fn(async () => '# Recon Report'),
+    complete: vi.fn(async () => '<report># Recon Report</report>'),
     ...overrides,
   };
 }
@@ -60,6 +60,15 @@ describe('ReconAgent', () => {
       }),
     });
     const agent = new ReconAgent(createIpcBus(), workspaceFileSystem, createLlmClient());
+
+    await expect(
+      agent.execute({ workspaceSlug: 'epic-2-agents', requirementsPath: '00-requirements.md' })
+    ).rejects.toBeInstanceOf(AgentExecutionError);
+  });
+
+  it('throws AgentExecutionError when the LLM response has no <report> block', async () => {
+    const llmClient = createLlmClient({ complete: vi.fn(async () => 'plain text, no tags') });
+    const agent = new ReconAgent(createIpcBus(), createWorkspaceFileSystem(), llmClient);
 
     await expect(
       agent.execute({ workspaceSlug: 'epic-2-agents', requirementsPath: '00-requirements.md' })

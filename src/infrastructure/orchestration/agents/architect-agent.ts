@@ -6,6 +6,8 @@ import type { IpcBusPort } from '../../../domain/orchestration/ports/ipc-bus-por
 import type { WorkspaceFileSystemPort } from '../../../domain/orchestration/ports/workspace-file-system-port.js';
 import type { LlmClientPort } from '../../../domain/orchestration/ports/llm-client-port.js';
 import { AgentExecutionError } from '../../../domain/orchestration/errors/agent-execution-error.js';
+import { LlmResponseExtractionError } from '../../../domain/orchestration/errors/llm-response-extraction-error.js';
+import { extractXmlBlock } from '../../../domain/orchestration/utils/llm-response-extractor.js';
 import { ArchitectPromptBuilder } from '../prompts/architect-prompt-builder.js';
 
 export const ARCHITECT_ARTIFACT_FILENAME = '02-contracts.md';
@@ -102,7 +104,8 @@ export class ArchitectAgent extends SubAgentBase {
 
     const systemPrompt = ArchitectPromptBuilder.buildSystemPrompt();
     const userPrompt = ArchitectPromptBuilder.buildInitialUserPrompt(requirementsContent, reconContent);
-    return this.llmClient.complete({ systemPrompt, userPrompt });
+    const rawResponse = await this.llmClient.complete({ systemPrompt, userPrompt });
+    return this.extractContract(rawResponse, context.workspaceSlug, undefined);
   }
 
   private async draftRevision(context: AgentContext, cycle: number | undefined): Promise<string> {
@@ -143,8 +146,26 @@ export class ArchitectAgent extends SubAgentBase {
       existingContractContent,
       context.pendingFeedback!
     );
-    const addendum = await this.llmClient.complete({ systemPrompt, userPrompt });
+    const rawResponse = await this.llmClient.complete({ systemPrompt, userPrompt });
+    const addendum = this.extractContract(rawResponse, context.workspaceSlug, cycle);
 
     return `${existingContractContent}\n\n${addendum}`;
+  }
+
+  private extractContract(rawResponse: string, workspaceSlug: string, cycle: number | undefined): string {
+    try {
+      return extractXmlBlock(rawResponse, 'contract');
+    } catch (cause) {
+      if (cause instanceof LlmResponseExtractionError) {
+        throw new AgentExecutionError(
+          this.role,
+          workspaceSlug,
+          cycle,
+          'LLM response did not contain a <contract> block',
+          cause
+        );
+      }
+      throw cause;
+    }
   }
 }

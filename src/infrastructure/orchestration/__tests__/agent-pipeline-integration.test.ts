@@ -60,13 +60,13 @@ function createScriptedLlmClient(responses: readonly string[]): LlmClientPort {
 describe('Recon -> Architect -> Skeptic revision pipeline (in-process)', () => {
   it('runs a full rejection-then-approval cycle and keeps ContractRevisionState invariants intact', async () => {
     const llmClient = createScriptedLlmClient([
-      '# Recon Report\nExisting conventions noted.',
-      '# Contracts\n## Ports\nInitial draft.',
+      '<report># Recon Report\nExisting conventions noted.</report>',
+      '<contract># Contracts\n## Ports\nInitial draft.</contract>',
       JSON.stringify({
         verdict: 'REJECTED',
         findings: [{ section: 'Ports', issue: 'missing adapter', severity: 'BLOCKER' }],
       }),
-      '## Addendum (cycle 1)\nAdded the missing adapter.',
+      '<contract>## Addendum (cycle 1)\nAdded the missing adapter.</contract>',
       JSON.stringify({ verdict: 'APPROVED', findings: [] }),
     ]);
     const workspaceFileSystem = createInMemoryWorkspaceFileSystem();

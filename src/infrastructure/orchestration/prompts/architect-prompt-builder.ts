@@ -17,7 +17,9 @@ The document must strictly contain the standard contract sections:
 - Failure semantics
 - Non-goals
 
-When revising an existing contract in response to feedback, DO NOT rewrite the original approved sections silently. Append an explicit addendum header: "## Revision Cycle N Addendum" addressing each BLOCKER and WARNING finding raised by the Skeptic.`;
+When revising an existing contract in response to feedback, DO NOT rewrite the original approved sections silently. Append an explicit addendum header: "## Revision Cycle N Addendum" addressing each BLOCKER and WARNING finding raised by the Skeptic.
+
+Output ONLY the document (or, in revision mode, only the addendum), wrapped in a single <contract>...</contract> tag. No conversational preamble or trailer outside the tag.`;
   }
 
   static buildInitialUserPrompt(requirementsContent: string, reconContent: string): string {

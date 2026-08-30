@@ -8,6 +8,8 @@ import type { IpcBusPort } from '../../../domain/orchestration/ports/ipc-bus-por
 import type { WorkspaceFileSystemPort } from '../../../domain/orchestration/ports/workspace-file-system-port.js';
 import type { LlmClientPort } from '../../../domain/orchestration/ports/llm-client-port.js';
 import { AgentExecutionError } from '../../../domain/orchestration/errors/agent-execution-error.js';
+import { LlmResponseExtractionError } from '../../../domain/orchestration/errors/llm-response-extraction-error.js';
+import { extractJson } from '../../../domain/orchestration/utils/llm-response-extractor.js';
 import { validateAgentResult } from '../../../domain/orchestration/validation/contract-invariants.js';
 import { SkepticPromptBuilder } from '../prompts/skeptic-prompt-builder.js';
 
@@ -101,15 +103,18 @@ export class SkepticAgent extends SubAgentBase {
   private parseLlmResponse(rawResponse: string, workspaceSlug: string, cycle: number): SkepticLlmResponse {
     let parsed: unknown;
     try {
-      parsed = JSON.parse(rawResponse);
+      parsed = extractJson<unknown>(rawResponse);
     } catch (cause) {
-      throw new AgentExecutionError(
-        this.role,
-        workspaceSlug,
-        cycle,
-        'LLM response is not valid JSON',
-        cause
-      );
+      if (cause instanceof LlmResponseExtractionError) {
+        throw new AgentExecutionError(
+          this.role,
+          workspaceSlug,
+          cycle,
+          'LLM response is not valid JSON',
+          cause
+        );
+      }
+      throw cause;
     }
 
     if (!this.isSkepticLlmResponse(parsed)) {

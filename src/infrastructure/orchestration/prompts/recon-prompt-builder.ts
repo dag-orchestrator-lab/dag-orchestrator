@@ -8,7 +8,9 @@ You MUST output a single Markdown document conforming exactly to the 6 reconnais
 3. Which shared packages already solve part of this?
 4. What conventions apply?
 5. What is genuinely absent?
-6. What could not be determined from the code alone?`;
+6. What could not be determined from the code alone?
+
+Output ONLY the report, wrapped in a single <report>...</report> tag. No conversational preamble or trailer outside the tag.`;
   }
 
   static buildUserPrompt(requirementsContent: string, codeContextSummary: string): string {

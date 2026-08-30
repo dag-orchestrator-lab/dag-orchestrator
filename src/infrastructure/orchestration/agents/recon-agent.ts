@@ -6,6 +6,8 @@ import type { IpcBusPort } from '../../../domain/orchestration/ports/ipc-bus-por
 import type { WorkspaceFileSystemPort } from '../../../domain/orchestration/ports/workspace-file-system-port.js';
 import type { LlmClientPort } from '../../../domain/orchestration/ports/llm-client-port.js';
 import { AgentExecutionError } from '../../../domain/orchestration/errors/agent-execution-error.js';
+import { LlmResponseExtractionError } from '../../../domain/orchestration/errors/llm-response-extraction-error.js';
+import { extractXmlBlock } from '../../../domain/orchestration/utils/llm-response-extractor.js';
 import { ReconPromptBuilder } from '../prompts/recon-prompt-builder.js';
 
 export const RECON_ARTIFACT_FILENAME = '01-recon.md';
@@ -50,7 +52,23 @@ export class ReconAgent extends SubAgentBase {
 
     const systemPrompt = ReconPromptBuilder.buildSystemPrompt();
     const userPrompt = ReconPromptBuilder.buildUserPrompt(requirementsContent, '');
-    const reconContent = await this.llmClient.complete({ systemPrompt, userPrompt });
+    const rawResponse = await this.llmClient.complete({ systemPrompt, userPrompt });
+
+    let reconContent: string;
+    try {
+      reconContent = extractXmlBlock(rawResponse, 'report');
+    } catch (cause) {
+      if (cause instanceof LlmResponseExtractionError) {
+        throw new AgentExecutionError(
+          this.role,
+          context.workspaceSlug,
+          undefined,
+          'LLM response did not contain a <report> block',
+          cause
+        );
+      }
+      throw cause;
+    }
 
     await this.workspaceFileSystem.writeFile(context.workspaceSlug, RECON_ARTIFACT_FILENAME, reconContent);
 

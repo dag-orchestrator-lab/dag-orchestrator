@@ -24,6 +24,11 @@ describe('ArchitectPromptBuilder', () => {
     expect(prompt).toContain('DO NOT rewrite the original approved sections silently');
   });
 
+  it('system prompt demands the document be wrapped in a <contract> tag', () => {
+    const prompt = ArchitectPromptBuilder.buildSystemPrompt();
+    expect(prompt).toContain('<contract>...</contract>');
+  });
+
   it('initial user prompt embeds requirements and recon content and instructs generating 02-contracts.md', () => {
     const prompt = ArchitectPromptBuilder.buildInitialUserPrompt('REQ CONTENT', 'RECON CONTENT');
     expect(prompt).toContain('REQ CONTENT');

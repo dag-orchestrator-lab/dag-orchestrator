@@ -12,6 +12,11 @@ describe('ReconPromptBuilder', () => {
     expect(prompt).toContain('What could not be determined from the code alone?');
   });
 
+  it('system prompt demands the report be wrapped in a <report> tag', () => {
+    const prompt = ReconPromptBuilder.buildSystemPrompt();
+    expect(prompt).toContain('<report>...</report>');
+  });
+
   it('user prompt embeds requirements and codebase summary and instructs producing 01-recon.md', () => {
     const prompt = ReconPromptBuilder.buildUserPrompt('REQ CONTENT', 'CODE SUMMARY');
     expect(prompt).toContain('REQ CONTENT');

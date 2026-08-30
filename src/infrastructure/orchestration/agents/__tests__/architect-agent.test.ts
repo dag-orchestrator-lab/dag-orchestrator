@@ -27,7 +27,7 @@ function createWorkspaceFileSystem(overrides: Partial<WorkspaceFileSystemPort> =
 
 function createLlmClient(overrides: Partial<LlmClientPort> = {}): LlmClientPort {
   return {
-    complete: vi.fn(async () => '# Contracts Document'),
+    complete: vi.fn(async () => '<contract># Contracts Document</contract>'),
     ...overrides,
   };
 }
@@ -95,6 +95,19 @@ describe('ArchitectAgent', () => {
     ).rejects.toBeInstanceOf(AgentExecutionError);
   });
 
+  it('throws AgentExecutionError when the LLM response has no <contract> block', async () => {
+    const llmClient = createLlmClient({ complete: vi.fn(async () => 'plain text, no tags') });
+    const agent = new ArchitectAgent(createIpcBus(), createWorkspaceFileSystem(), llmClient);
+
+    await expect(
+      agent.execute({
+        workspaceSlug: 'epic-2-agents',
+        requirementsPath: '00-requirements.md',
+        reconPath: '01-recon.md',
+      })
+    ).rejects.toBeInstanceOf(AgentExecutionError);
+  });
+
   it('writes 02-contracts.md and publishes STAGE_COMPLETE in first-pass mode', async () => {
     const ipcBus = createIpcBus();
     const workspaceFileSystem = createWorkspaceFileSystem();
@@ -125,7 +138,7 @@ describe('ArchitectAgent', () => {
       readFile: vi.fn(async () => '# Existing Contract\nOriginal section text.'),
     });
     const llmClient = createLlmClient({
-      complete: vi.fn(async () => '## Revision Cycle 1 Addendum\nAddressed BLOCKER finding.'),
+      complete: vi.fn(async () => '<contract>## Revision Cycle 1 Addendum\nAddressed BLOCKER finding.</contract>'),
     });
     const agent = new ArchitectAgent(createIpcBus(), workspaceFileSystem, llmClient);
 
