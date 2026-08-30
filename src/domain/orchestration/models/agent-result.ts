@@ -10,4 +10,8 @@ export interface AgentResult {
   readonly verdict?: SkepticVerdict;
   /** Only set when verdict === 'REJECTED'. */
   readonly feedback?: ContractFeedbackRecord;
+  /** Relative workspace paths of artifacts durably written by this agent run. */
+  readonly artifactsProduced?: string[];
+  /** Terminal outcome of this agent run. */
+  readonly status?: 'COMPLETED' | 'FAILED';
 }
