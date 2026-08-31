@@ -162,6 +162,9 @@ models:
   claude-code:
     provider: cli
     command: "claude -p"
+  claude-opus-5:
+    provider: cli
+    command: "claude -p --model claude-opus-5"
 
 workflow:
   step_0_refine:
@@ -174,8 +177,8 @@ workflow:
     gate: "Gate 1 (Human Approval)"
     artifact: "02-contracts.md"
   step_2_layers:
-    fanout_model: gemini-flash
-    merger_model: claude-code
+    fanout_model: claude-opus-5
+    merger_model: claude-opus-5
     gate: "Gate 2 (Conflict Resolution)"
     artifact: "05-tasks.md"
   step_3_implement:
@@ -877,8 +880,8 @@ async function runStep3() {
 
   if (!activeTaskBlock) {
     logSuccess('All tasks in 05-tasks.md are already marked as completed!');
-    console.log(`\n👉 Run \`dag next\` or \`dag review\` to proceed to Step 4 (Impact Review)!\n`);
-    return;
+    console.log(`\n👉 Auto-transitioning to Step 4 (Impact Review)...\n`);
+    return runStep4();
   }
 
   const codingProvider = getProviderForStage('coding');
@@ -1044,7 +1047,7 @@ Format your output cleanly.`;
             logStep('Regenerating 02-contracts.md with AI recommendation...', 'DAG Engine', 'Step 1');
             
             // Re-run Step 1 passing the synthesized recommendation as feedback
-            const reqText = fs.readFileSync('00-requirements.md', 'utf8');
+            const reqText = fs.readFileSync(resolveArtifactPath('00-requirements.md'), 'utf8');
             const repoSummary = getRepoContextSummary();
             const projectRules = loadProjectRules();
             const rulesPrompt = formatRulesForPrompt(projectRules);

@@ -31,8 +31,13 @@ export function getProviderForStage(stageName, customConfig) {
 export async function executeStagePrompt(stageName, prompt, systemPrompt, options) {
   const { finalPrompt, systemPrompt: sysPrompt } = buildPrompt(stageName, prompt, options);
   const result = await executeStagePromptUseCase.execute(stageName, finalPrompt, systemPrompt || sysPrompt, options);
+  
+  if (result && typeof result === 'string' && /hit your session limit/i.test(result)) {
+    throw new Error(`Model provider rate limit / session limit reached: ${result}`);
+  }
+
   if (result.isErr) {
     throw new Error(result.error.message);
   }
-  return result.value;
+  return result.value || result;
 }

@@ -24,7 +24,18 @@ export interface Configuration {
 export function resolveConfiguration(): Configuration {
   const rootDir = process.env.DAG_WORKSPACE_ROOT ?? process.cwd();
   const dagDir = path.join(rootDir, DAG_DIR_NAME);
-  const featuresDir = path.join(dagDir, FEATURES_DIR_NAME);
+  let featuresDir = path.join(dagDir, FEATURES_DIR_NAME);
+  
+  const configPath = path.join(dagDir, 'config.json');
+  if (require('fs').existsSync(configPath)) {
+    try {
+      const config = JSON.parse(require('fs').readFileSync(configPath, 'utf8'));
+      if (config.SPECS_DIR) {
+        featuresDir = path.join(rootDir, config.SPECS_DIR);
+      }
+    } catch {}
+  }
+  
   const archivedDir = path.join(dagDir, ARCHIVED_DIR_NAME);
   return { rootDir, dagDir, featuresDir, archivedDir };
 }
